@@ -21,3 +21,4 @@ eu.webrobot.plugins.enrichment.LlamaFeesStage
 eu.webrobot.plugins.enrichment.ChainTvlStage
 eu.webrobot.plugins.enrichment.BinanceFundingStage
 eu.webrobot.plugins.enrichment.SecFundamentalsStage
+eu.webrobot.plugins.enrichment.StockPriceStage
