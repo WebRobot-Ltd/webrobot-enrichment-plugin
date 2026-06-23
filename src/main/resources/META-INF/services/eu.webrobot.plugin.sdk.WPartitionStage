@@ -19,3 +19,4 @@ eu.webrobot.plugins.enrichment.FearGreedStage
 eu.webrobot.plugins.enrichment.LlamaPriceStage
 eu.webrobot.plugins.enrichment.LlamaFeesStage
 eu.webrobot.plugins.enrichment.ChainTvlStage
+eu.webrobot.plugins.enrichment.BinanceFundingStage
