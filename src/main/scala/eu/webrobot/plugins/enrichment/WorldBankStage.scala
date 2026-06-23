@@ -52,7 +52,7 @@ object WorldBankStage {
   def fetch(code: String, inds: Vector[String], ctx: WebroStageContext): Map[String, Any] = {
     val c = java.net.URLEncoder.encode(code, "UTF-8")
     inds.flatMap { ind =>
-      val url = s"https://api.worldbank.org/v2/country/$c/indicator/$ind?format=json&mrnev=1"
+      val url = s"https://api.worldbank.org/v2/country/$c/indicator/$ind?format=json&mrv=1"
       val body = Try(ctx.httpGet(url, Map("Accept" -> "application/json"), 30000)).getOrElse("")
       // page metadata is the first JSON object; the observation (with "value") is in the second array
       if (body.isEmpty || body.contains("\"message\"")) Seq.empty
