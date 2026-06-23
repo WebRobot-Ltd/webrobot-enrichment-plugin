@@ -30,23 +30,21 @@ spec:
     parameters {
         choice(name: 'BUILD_TYPE', choices: ['development', 'production'], description: 'Plugin channel (MinIO jars/<BUILD_TYPE>/plugins/)')
         booleanParam(name: 'ENABLE_PLUGIN', defaultValue: false, description: 'Register the plugin as enabled (auto-load) — false = upload only')
+        // API admin key as a PARAMETER (not a credential) so a missing value never fails the binding;
+        // registration is optional — empty = build + upload only (register later via the marketplace API).
+        password(name: 'API_ADMIN_KEY', defaultValue: '', description: 'super-admin API key to auto-register/enable the plugin (optional)')
     }
 
     environment {
         PLUGIN_ID      = 'webrobot-enrichment-plugin'
         PLUGIN_VERSION = '0.1.0'
-        // --- GitHub Packages (to resolve webrobot-plugin-sdk) ---
-        GITHUB_ACTOR   = 'webroboteu'
-        GITHUB_TOKEN   = credentials('github-packages-token')
-        // --- MinIO (plugin jar + manifest store) ---
-        MINIO_ENDPOINT     = 'https://s3.metaglobe.finance'
-        MINIO_BUCKET       = 'sparklogs-data'
-        MINIO_ALIAS        = 'minio-local'
-        MINIO_ACCESS_KEY   = credentials('minio-access-key')
-        MINIO_SECRET_KEY   = credentials('minio-secret-key')
-        // --- WebRobot marketplace registration ---
-        API_ENDPOINT  = 'http://webrobot-jersey-api-service.webrobot.svc.cluster.local:8020'
-        API_ADMIN_KEY = credentials('webrobot-api-admin-key')
+        // Jenkins credentials only — NEVER hardcode secrets (this repo is PUBLIC).
+        GITHUB = credentials('github-token')   // _USR = actor, _PSW = token (resolves the published SDK)
+        MINIO  = credentials('minio-creds')    // _USR = access key, _PSW = secret (plugin jar store)
+        MINIO_ENDPOINT = 'https://s3.metaglobe.finance'
+        MINIO_BUCKET   = 'sparklogs-data'
+        MINIO_ALIAS    = 'minio-local'
+        API_ENDPOINT   = 'http://webrobot-jersey-api-service.webrobot.svc.cluster.local:8020'
     }
 
     stages {
@@ -56,7 +54,7 @@ spec:
                     sh '''
                         echo "📦 Building ${PLUGIN_ID}-${PLUGIN_VERSION} against published webrobot-plugin-sdk..."
                         # the gradle-playwright agent has gradle on PATH (same as the ETL Jenkinsfile) — no wrapper needed
-                        GITHUB_ACTOR="${GITHUB_ACTOR}" GITHUB_TOKEN="${GITHUB_TOKEN}" gradle --no-daemon clean jar
+                        GITHUB_ACTOR="${GITHUB_USR}" GITHUB_TOKEN="${GITHUB_PSW}" gradle --no-daemon clean jar
                         ls -lh build/libs/
                     '''
                 }
@@ -76,7 +74,7 @@ spec:
 
                         # mc client
                         [ -x /tmp/mc ] || ( wget -qO /tmp/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /tmp/mc )
-                        /tmp/mc alias set ${MINIO_ALIAS} ${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY} --insecure
+                        /tmp/mc alias set ${MINIO_ALIAS} ${MINIO_ENDPOINT} ${MINIO_USR} ${MINIO_PSW} --insecure
 
                         echo "⬆️  Uploading ${PLUGIN_JAR} → ${DEST}"
                         /tmp/mc cp "${PLUGIN_JAR}" "${DEST}" --insecure
