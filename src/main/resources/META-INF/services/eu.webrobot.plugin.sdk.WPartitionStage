@@ -13,3 +13,9 @@ eu.webrobot.plugins.enrichment.GleifStage
 eu.webrobot.plugins.enrichment.FrankfurterStage
 eu.webrobot.plugins.enrichment.CensusGeocodeStage
 eu.webrobot.plugins.enrichment.FccAreaStage
+eu.webrobot.plugins.enrichment.CoinGeckoStage
+eu.webrobot.plugins.enrichment.DefiLlamaStage
+eu.webrobot.plugins.enrichment.FearGreedStage
+eu.webrobot.plugins.enrichment.LlamaPriceStage
+eu.webrobot.plugins.enrichment.LlamaFeesStage
+eu.webrobot.plugins.enrichment.ChainTvlStage
