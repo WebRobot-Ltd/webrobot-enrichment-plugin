@@ -24,7 +24,9 @@ repositories {
 
 val scalaV     = "2.12"
 val scalaFullV = "2.12.18"
-val sdkVersion = "latest.release"
+// pinned to the published SDK version (GitHub Packages WebRobot-Ltd/webrobot-etl) — avoids the
+// maven-metadata lookup that `latest.release` needs (and which a read-only token may not see).
+val sdkVersion = "0.9.0.4"
 
 dependencies {
     // The ONLY dependency — the WebRobot plugin SDK. No ETL internals, no SpookyStuff, no JSON lib

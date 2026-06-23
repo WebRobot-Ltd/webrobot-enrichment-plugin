@@ -41,7 +41,7 @@ spec:
         PLUGIN_ID      = 'webrobot-enrichment-plugin'
         PLUGIN_VERSION = '0.1.0'
         // Jenkins credentials only — NEVER hardcode secrets (this repo is PUBLIC).
-        GITHUB = credentials('github-token')   // _USR = actor, _PSW = token (resolves the published SDK)
+        GITHUB = credentials('github-token-1')   // _USR = actor, _PSW = token WITH packages access (reads the published SDK)
         MINIO  = credentials('minio-creds')    // _USR = access key, _PSW = secret (plugin jar store)
         MINIO_ENDPOINT = 'https://s3.metaglobe.finance'
         MINIO_BUCKET   = 'sparklogs-data'
