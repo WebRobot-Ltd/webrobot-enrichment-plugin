@@ -7,3 +7,9 @@ eu.webrobot.plugins.enrichment.OecdStage
 eu.webrobot.plugins.enrichment.BancaItaliaStage
 eu.webrobot.plugins.enrichment.FredStage
 eu.webrobot.plugins.enrichment.OverpassStage
+eu.webrobot.plugins.enrichment.CountryInfoStage
+eu.webrobot.plugins.enrichment.OpenMeteoStage
+eu.webrobot.plugins.enrichment.GleifStage
+eu.webrobot.plugins.enrichment.FrankfurterStage
+eu.webrobot.plugins.enrichment.CensusGeocodeStage
+eu.webrobot.plugins.enrichment.FccAreaStage
