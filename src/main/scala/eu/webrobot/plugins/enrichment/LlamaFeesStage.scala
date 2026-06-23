@@ -30,15 +30,14 @@ class LlamaFeesStage extends WPartitionStage {
   override def name: String = "llamaFees"
 
   override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "protocol")
-    val dateF = args.string(1, "date")
-    val dtype = args.string(2, "dailyFees")
+    val spec  = JoinSpec.from(args, "protocol", "date")
+    val dtype = if (spec.extras.contains("dataType")) spec.extra("dataType") else args.string(2, "dailyFees")
     val px    = if (dtype.toLowerCase.contains("revenue")) "rev_" else "fees_"
     val chart = mutable.Map.empty[String, Vector[(Long, Double)]]
     val cur   = mutable.Map.empty[String, Map[String, Any]]
     rows.map { row =>
-      val slug = row.str(field).getOrElse("").trim.toLowerCase
-      val date = row.str(dateF).getOrElse("").trim
+      val slug = row.str(spec.on).getOrElse("").trim.toLowerCase
+      val date = spec.asof.flatMap(c => row.str(c)).getOrElse("").trim
       if (slug.isEmpty) row
       else if (date.nonEmpty) {
         val series = chart.getOrElseUpdate(slug, Try(LlamaFeesStage.history(slug, dtype, ctx)).getOrElse(Vector.empty))

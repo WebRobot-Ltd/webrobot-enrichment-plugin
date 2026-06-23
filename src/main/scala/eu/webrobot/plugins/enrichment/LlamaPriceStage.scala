@@ -27,12 +27,11 @@ class LlamaPriceStage extends WPartitionStage {
   override def name: String = "llamaPrice"
 
   override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "token")
-    val dateF = args.string(1, "date")
+    val spec  = JoinSpec.from(args, "token", "date")
     val cache = mutable.Map.empty[String, Option[(String, String)]]
     rows.map { row =>
-      val token = row.str(field).getOrElse("").trim
-      val date  = row.str(dateF).getOrElse("").trim
+      val token = row.str(spec.on).getOrElse("").trim
+      val date  = spec.asof.flatMap(c => row.str(c)).getOrElse("").trim
       if (token.isEmpty) row
       else {
         val res = cache.getOrElseUpdate(s"$token|$date",

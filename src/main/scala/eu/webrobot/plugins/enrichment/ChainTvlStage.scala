@@ -1,59 +1,35 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.WebroStageContext
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
- * DefiLlama chain-TVL enrichment — FREE, no API key. Adds the total DeFi TVL (USD) of a blockchain to each
- * row, keyed by chain name (e.g. "Ethereum", "Arbitrum"). Point-in-time aware: with a date column it
- * returns the chain TVL AS OF that day (no look-ahead) from the chain's historical series; else the latest.
- * A macro DeFi risk-regime signal (capital flowing into / out of a chain).
+ * DefiLlama chain-TVL enrichment — FREE, no API key. Total DeFi TVL (USD) of a blockchain, joined to each
+ * row by chain name. Modeled as an as-of JOIN (see [[AsOfEnricher]]): with an `asof` column it returns the
+ * chain TVL as of that day (backward, no look-ahead); otherwise the latest. Macro DeFi risk-regime signal.
  *
  * Pipeline YAML:
  * {{{
  * - stage: chainTvl
- *   args:
- *     - "chain"       # chain-name column (default "chain")
- *     - "date"        # date column YYYY-MM-DD for point-in-time (default "date"; missing → latest)
+ *   args: [{ on: chain, asof: date }]   # or positional ["chain", "date"]
  * }}}
  * Adds chain_tvl_usd (and chain_tvl_date).
  */
-class ChainTvlStage extends WPartitionStage {
-
+class ChainTvlStage extends AsOfEnricher {
   override def name: String = "chainTvl"
+  override protected def defaultOn: String = "chain"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "chain")
-    val dateF = args.string(1, "date")
-    val hist = mutable.Map.empty[String, Vector[(Long, Double)]]
-    rows.map { row =>
-      val chain = row.str(field).getOrElse("").trim
-      val date  = row.str(dateF).getOrElse("").trim
-      if (chain.isEmpty) row
-      else {
-        val series = hist.getOrElseUpdate(chain, Try(ChainTvlStage.history(chain, ctx)).getOrElse(Vector.empty))
-        val cutoff = if (date.nonEmpty)
-          Try(java.time.LocalDate.parse(date).atStartOfDay(java.time.ZoneOffset.UTC).toEpochSecond).getOrElse(Long.MaxValue)
-        else Long.MaxValue
-        series.filter(_._1 <= cutoff).sortBy(_._1).lastOption match {
-          case Some((ts, tvl)) =>
-            row.set("chain_tvl_usd", f"$tvl%.2f")
-               .set("chain_tvl_date", java.time.Instant.ofEpochSecond(ts).atZone(java.time.ZoneOffset.UTC).toLocalDate.toString)
-          case None => row
-        }
-      }
-    }
+  override protected def series(chain: String, spec: JoinSpec, ctx: WebroStageContext): Vector[(Long, Map[String, Any])] = {
+    val c = java.net.URLEncoder.encode(chain, "UTF-8")
+    val body = Try(ctx.httpGet(s"https://api.llama.fi/v2/historicalChainTvl/$c", Map("Accept" -> "application/json"), 45000)).getOrElse("")
+    ChainTvlStage.POINT.findAllMatchIn(body).map { m =>
+      val ts = m.group(1).toLong
+      ts -> Map[String, Any]("chain_tvl_usd" -> f"${m.group(2).toDouble}%.2f", "chain_tvl_date" -> AsOf.toDate(ts))
+    }.toVector
   }
 }
 
 object ChainTvlStage {
   private val POINT = """"date"\s*:\s*(\d+)\s*,\s*"tvl"\s*:\s*([\d.eE+]+)""".r
-  def history(chain: String, ctx: WebroStageContext): Vector[(Long, Double)] = {
-    val c = java.net.URLEncoder.encode(chain, "UTF-8")
-    val body = Try(ctx.httpGet(s"https://api.llama.fi/v2/historicalChainTvl/$c",
-      Map("Accept" -> "application/json"), 45000)).getOrElse("")
-    POINT.findAllMatchIn(body).map(m => (m.group(1).toLong, m.group(2).toDouble)).toVector
-  }
 }

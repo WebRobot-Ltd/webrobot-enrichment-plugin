@@ -27,12 +27,11 @@ class BinanceFundingStage extends WPartitionStage {
   override def name: String = "binanceFunding"
 
   override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val symF  = args.string(0, "symbol")
-    val dateF = args.string(1, "date")
+    val spec  = JoinSpec.from(args, "symbol", "date")
     val cache = mutable.Map.empty[String, Map[String, Any]]
     rows.map { row =>
-      val sym  = row.str(symF).getOrElse("").trim.toUpperCase
-      val date = row.str(dateF).getOrElse("").trim
+      val sym  = row.str(spec.on).getOrElse("").trim.toUpperCase
+      val date = spec.asof.flatMap(c => row.str(c)).getOrElse("").trim
       if (sym.isEmpty) row
       else {
         val d = cache.getOrElseUpdate(s"$sym|$date", Try(BinanceFundingStage.fetch(sym, date, ctx)).getOrElse(Map.empty))

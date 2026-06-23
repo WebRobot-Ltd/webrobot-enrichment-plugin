@@ -1,71 +1,36 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.WebroStageContext
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
- * DefiLlama TVL enrichment — FREE, no API key. Adds a protocol's Total Value Locked (USD) to each row,
- * keyed by the DefiLlama protocol slug (e.g. "aave", "uniswap"). Point-in-time aware: with a date column
- * it returns the TVL as of that date (no look-ahead) from the protocol's historical series; otherwise the
- * current TVL.
+ * DefiLlama protocol-TVL enrichment — FREE, no API key. A protocol's Total Value Locked (USD), joined to
+ * each row by the DefiLlama protocol slug. Modeled as an as-of JOIN (see [[AsOfEnricher]]): with an `asof`
+ * column it returns the TVL as of that day (backward, no look-ahead — `None`/untouched when the date
+ * precedes the protocol's history, never a fabricated future value); otherwise the latest TVL.
  *
  * Pipeline YAML:
  * {{{
  * - stage: defiLlama
- *   args:
- *     - "protocol"    # protocol-slug column (default "protocol")
- *     - "date"        # date column YYYY-MM-DD for point-in-time (default "date"; missing → current TVL)
+ *   args: [{ on: protocol, asof: date }]   # or positional ["protocol", "date"]
  * }}}
- * Adds tvl_usd (and tvl_date when point-in-time).
+ * Adds tvl_usd (and tvl_date).
  */
-class DefiLlamaStage extends WPartitionStage {
-
+class DefiLlamaStage extends AsOfEnricher {
   override def name: String = "defiLlama"
+  override protected def defaultOn: String = "protocol"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "protocol")
-    val dateF = args.string(1, "date")
-    // cache the full historical series per protocol (one fetch) for point-in-time lookups
-    val hist = mutable.Map.empty[String, Vector[(Long, Double)]]
-    val cur  = mutable.Map.empty[String, Option[String]]
-    rows.map { row =>
-      val slug = row.str(field).getOrElse("").trim.toLowerCase
-      val date = row.str(dateF).getOrElse("").trim
-      if (slug.isEmpty) row
-      else if (date.nonEmpty) {
-        val series = hist.getOrElseUpdate(slug, Try(DefiLlamaStage.history(slug, ctx)).getOrElse(Vector.empty))
-        DefiLlamaStage.asOf(series, date) match {
-          case Some((ts, tvl)) => row.set("tvl_usd", f"$tvl%.2f").set("tvl_date", DefiLlamaStage.toDate(ts))
-          case None            => row
-        }
-      } else {
-        val v = cur.getOrElseUpdate(slug, Try(DefiLlamaStage.current(slug, ctx)).toOption.flatten)
-        v.map(t => row.set("tvl_usd", t)).getOrElse(row)
-      }
-    }
+  override protected def series(slug: String, spec: JoinSpec, ctx: WebroStageContext): Vector[(Long, Map[String, Any])] = {
+    val s = slug.toLowerCase
+    val body = Try(ctx.httpGet(s"https://api.llama.fi/protocol/$s", Map("Accept" -> "application/json"), 45000)).getOrElse("")
+    DefiLlamaStage.POINT.findAllMatchIn(body).map { m =>
+      val ts = m.group(1).toLong
+      ts -> Map[String, Any]("tvl_usd" -> f"${m.group(2).toDouble}%.2f", "tvl_date" -> AsOf.toDate(ts))
+    }.toVector
   }
 }
 
 object DefiLlamaStage {
   private val POINT = """"date"\s*:\s*(\d+)\s*,\s*"totalLiquidityUSD"\s*:\s*([\d.eE+]+)""".r
-
-  def current(slug: String, ctx: WebroStageContext): Option[String] = {
-    val body = Try(ctx.httpGet(s"https://api.llama.fi/tvl/$slug", Map("Accept" -> "application/json"), 30000)).getOrElse("")
-    if (body.nonEmpty && body.matches("[\\d.eE+]+")) Some(body.trim) else None
-  }
-
-  def history(slug: String, ctx: WebroStageContext): Vector[(Long, Double)] = {
-    val body = Try(ctx.httpGet(s"https://api.llama.fi/protocol/$slug", Map("Accept" -> "application/json"), 45000)).getOrElse("")
-    POINT.findAllMatchIn(body).map(m => (m.group(1).toLong, m.group(2).toDouble)).toVector
-  }
-
-  /** latest point with date <= the requested day (point-in-time, no look-ahead). */
-  def asOf(series: Vector[(Long, Double)], date: String): Option[(Long, Double)] = {
-    val cutoff = Try(java.time.LocalDate.parse(date).atStartOfDay(java.time.ZoneOffset.UTC).toEpochSecond).getOrElse(Long.MaxValue)
-    series.filter(_._1 <= cutoff).sortBy(_._1).lastOption.orElse(series.sortBy(_._1).headOption)
-  }
-  def toDate(ts: Long): String =
-    java.time.Instant.ofEpochSecond(ts).atZone(java.time.ZoneOffset.UTC).toLocalDate.toString
 }
