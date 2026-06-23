@@ -14,6 +14,8 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+  imagePullSecrets:
+  - name: docker-config-secret
   containers:
   - name: gradle-playwright
     image: ghcr.io/webrobot-ltd/jenkins-agent-web:latest
