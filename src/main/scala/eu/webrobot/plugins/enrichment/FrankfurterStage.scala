@@ -44,7 +44,7 @@ class FrankfurterStage extends WPartitionStage {
 object FrankfurterStage {
   def fetch(date: String, base: String, target: String, ctx: WebroStageContext): Option[(String, String)] = {
     val day = if (date.nonEmpty) date else "latest"
-    val url = s"https://api.frankfurter.app/$day?from=$base&to=$target"
+    val url = s"https://api.frankfurter.dev/v1/$day?from=$base&to=$target"
     val body = Try(ctx.httpGet(url, Map("Accept" -> "application/json"), 30000)).getOrElse("")
     if (body.isEmpty) None
     else {
