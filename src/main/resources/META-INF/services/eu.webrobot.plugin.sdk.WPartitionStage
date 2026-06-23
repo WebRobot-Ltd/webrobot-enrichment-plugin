@@ -1,1 +1,5 @@
 eu.webrobot.plugins.enrichment.LandRegistryStage
+eu.webrobot.plugins.enrichment.WorldBankStage
+eu.webrobot.plugins.enrichment.NominatimStage
+eu.webrobot.plugins.enrichment.IstatStage
+eu.webrobot.plugins.enrichment.EurostatStage
