@@ -56,7 +56,9 @@ object OverpassStage {
     val ql =
       s"[out:json][timeout:25];(node$sel(around:$radius,$lat,$lon);way$sel(around:$radius,$lat,$lon););out count;"
     val url = s"$base?data=${java.net.URLEncoder.encode(ql, "UTF-8")}"
-    val body = Try(ctx.httpGet(url, Map("Accept" -> "application/json"), 45000)).getOrElse("")
+    val body = Try(ctx.httpGet(url,
+      Map("Accept" -> "application/json", "User-Agent" -> "WebRobot-Enrichment/1.0 (https://webrobot.eu)"),
+      45000)).getOrElse("")
     if (body.isEmpty || !body.contains("count")) None
     else TOTAL.findFirstMatchIn(body).map(_.group(1))
   }
