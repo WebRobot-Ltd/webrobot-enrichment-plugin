@@ -59,7 +59,9 @@ object WorldBankStage {
       else {
         val value = VALUE.findFirstMatchIn(body).map(_.group(1))
         val year  = DATE.findFirstMatchIn(body).map(_.group(1))
-        value.toSeq.flatMap(v => Seq(s"wb_$ind" -> v) ++ year.map(y => s"wb_${ind}_year" -> y))
+        // dots/specials are illegal in Spark/parquet column names → sanitize SP.POP.TOTL -> sp_pop_totl
+        val col = "wb_" + ind.toLowerCase.replaceAll("[^a-z0-9]+", "_")
+        value.toSeq.flatMap(v => Seq(col -> v) ++ year.map(y => s"${col}_year" -> y))
       }
     }.toMap
   }

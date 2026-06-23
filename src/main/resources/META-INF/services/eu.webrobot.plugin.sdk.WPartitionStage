@@ -3,3 +3,7 @@ eu.webrobot.plugins.enrichment.WorldBankStage
 eu.webrobot.plugins.enrichment.NominatimStage
 eu.webrobot.plugins.enrichment.IstatStage
 eu.webrobot.plugins.enrichment.EurostatStage
+eu.webrobot.plugins.enrichment.OecdStage
+eu.webrobot.plugins.enrichment.BancaItaliaStage
+eu.webrobot.plugins.enrichment.FredStage
+eu.webrobot.plugins.enrichment.OverpassStage
