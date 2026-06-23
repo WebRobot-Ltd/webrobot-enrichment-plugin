@@ -1,8 +1,7 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.{WArgs, WebroStageContext}
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
@@ -12,27 +11,18 @@ import scala.util.Try
  * Pipeline YAML:
  * {{{
  * - stage: gleif
- *   args:
- *     - "company"     # legal-name column (default "company")
+ *   args: [{ on: company }]   # legal-name column (default "company")
  * }}}
  * Adds lei, lei_status, lei_jurisdiction.
  */
-class GleifStage extends WPartitionStage {
+class GleifStage extends KeyedEnricher {
 
   override def name: String = "gleif"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "company")
-    val cache = mutable.Map.empty[String, Map[String, Any]]
-    rows.map { row =>
-      val nm = row.str(field).getOrElse("").trim
-      if (nm.isEmpty) row
-      else {
-        val d = cache.getOrElseUpdate(nm, Try(GleifStage.fetch(nm, ctx)).getOrElse(Map.empty))
-        d.foldLeft(row) { case (r, (k, v)) => r.set(k, v) }
-      }
-    }
-  }
+  override protected def defaultKey: String = "company"
+
+  override protected def enrich(key: String, args: WArgs, ctx: WebroStageContext): Map[String, Any] =
+    GleifStage.fetch(key, ctx)
 }
 
 object GleifStage {

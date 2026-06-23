@@ -1,53 +1,57 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.{WArgs, WRow, WebroStageContext}
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
  * OpenStreetMap Overpass enrichment — FREE, no API key (rate-limited). For each row with a lat/lon, counts
- * nearby OSM features of a given key=value within a radius. The "what's around here" primitive for
- * location intelligence (e.g. count hospitals/schools/restaurants near a property).
+ * nearby OSM features of a given key=value within a radius. A SPATIAL + AGGREGATE join on a composite
+ * (lat, lon, tag, radius) key — modeled on [[RowEnricher]] (the criterion is within-radius count).
  *
  * Pipeline YAML:
  * {{{
  * - stage: overpass
- *   args:
- *     - "geo_lat"        # latitude column (default "geo_lat" — pairs with the geocode stage)
- *     - "geo_lon"        # longitude column (default "geo_lon")
- *     - "amenity=hospital"  # OSM tag selector key=value (default "amenity=hospital")
- *     - 1000             # radius in metres (default 1000)
- *     - "osm_count"      # output column (default "osm_count")
+ *   args: [{ lat: geo_lat, lon: geo_lon, tag: "amenity=hospital", radius: "1000", out: osm_count }]
+ *   # or positional ["geo_lat", "geo_lon", "amenity=hospital", 1000, "osm_count"]
  * }}}
  * Parses the Overpass `out count` JSON with regex to stay dependency-free (SDK-only jar).
  */
-class OverpassStage extends WPartitionStage {
+class OverpassStage extends RowEnricher {
 
   override def name: String = "overpass"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val latF   = args.string(0, "geo_lat")
-    val lonF   = args.string(1, "geo_lon")
-    val tag    = args.string(2, "amenity=hospital")
-    val radius = args.int(3, 1000)
-    val outCol = args.string(4, "osm_count")
-    val base   = args.string(5, "https://overpass-api.de/api/interpreter")
-    val cache  = mutable.Map.empty[String, Option[String]]
-    rows.map { row =>
-      val lat = row.str(latF).getOrElse("").trim
-      val lon = row.str(lonF).getOrElse("").trim
-      if (lat.isEmpty || lon.isEmpty) row
-      else {
-        val cnt = cache.getOrElseUpdate(s"$lat,$lon|$tag|$radius",
-          Try(OverpassStage.count(base, lat, lon, tag, radius, ctx)).toOption.flatten)
-        cnt.map(c => row.set(outCol, c)).getOrElse(row)
-      }
-    }
+  override protected def cacheKey(row: WRow, args: WArgs): String = {
+    val p = OverpassStage.params(args)
+    val lat = row.str(p.latF).getOrElse("").trim
+    val lon = row.str(p.lonF).getOrElse("").trim
+    if (lat.isEmpty || lon.isEmpty) "" else s"$lat,$lon|${p.tag}|${p.radius}"
+  }
+
+  override protected def enrich(row: WRow, args: WArgs, ctx: WebroStageContext): Map[String, Any] = {
+    val p   = OverpassStage.params(args)
+    val lat = row.str(p.latF).getOrElse("").trim
+    val lon = row.str(p.lonF).getOrElse("").trim
+    OverpassStage.count(p.base, lat, lon, p.tag, p.radius, ctx)
+      .map(c => Map[String, Any](p.outCol -> c)).getOrElse(Map.empty)
   }
 }
 
 object OverpassStage {
+  private final case class Params(latF: String, lonF: String, tag: String, radius: Int, outCol: String, base: String)
+
+  private def params(args: WArgs): Params = {
+    val s = JoinSpec.from(args, "")
+    Params(
+      s.extra("lat", args.string(0, "geo_lat")),
+      s.extra("lon", args.string(1, "geo_lon")),
+      s.extra("tag", args.string(2, "amenity=hospital")),
+      Try(s.extra("radius", args.int(3, 1000).toString).toInt).getOrElse(1000),
+      s.extra("out", args.string(4, "osm_count")),
+      s.extra("base", args.string(5, "https://overpass-api.de/api/interpreter"))
+    )
+  }
+
   // out count → {"elements":[{"type":"count","tags":{"total":"3","nodes":"3",...}}]}
   private val TOTAL = """"total"\s*:\s*"?(\d+)"?""".r
   def count(base: String, lat: String, lon: String, tag: String, radius: Int, ctx: WebroStageContext): Option[String] = {

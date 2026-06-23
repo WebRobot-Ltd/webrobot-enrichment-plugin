@@ -1,8 +1,7 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.{WArgs, WebroStageContext}
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
@@ -17,30 +16,23 @@ import scala.util.Try
  * Pipeline YAML:
  * {{{
  * - stage: worldBank
- *   args:
- *     - "country"                                    # ISO2/ISO3 country-code column (default "country")
- *     - "SP.POP.TOTL,NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG"  # indicator codes (default: pop, GDP/capita, inflation)
+ *   args: [{ on: country, indicators: "SP.POP.TOTL,NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG" }]
+ *   # on: ISO2/ISO3 country-code column (default "country"); indicators: codes (default pop, GDP/cap, inflation)
+ *   # positional ["country", "SP.POP.TOTL,..."] still works
  * }}}
  *
- * Parses the well-formed World Bank JSON with regex to stay dependency-free (SDK-only jar).
+ * Equi-join enricher. Parses the well-formed World Bank JSON with regex to stay dependency-free (SDK-only jar).
  */
-class WorldBankStage extends WPartitionStage {
+class WorldBankStage extends KeyedEnricher {
 
   override def name: String = "worldBank"
+  override protected def defaultKey: String = "country"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "country")
-    val inds = args.string(1, "SP.POP.TOTL,NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG")
+  override protected def enrich(key: String, args: WArgs, ctx: WebroStageContext): Map[String, Any] = {
+    val inds = JoinSpec.from(args, "country")
+      .extra("indicators", args.string(1, "SP.POP.TOTL,NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG"))
       .split(",").map(_.trim).filter(_.nonEmpty).toVector
-    val cache = mutable.Map.empty[String, Map[String, Any]]
-    rows.map { row =>
-      val code = row.str(field).getOrElse("").trim
-      if (code.isEmpty) row
-      else {
-        val data = cache.getOrElseUpdate(code, Try(WorldBankStage.fetch(code, inds, ctx)).getOrElse(Map.empty))
-        data.foldLeft(row) { case (r, (k, v)) => r.set(k, v) }
-      }
-    }
+    WorldBankStage.fetch(key, inds, ctx)
   }
 }
 

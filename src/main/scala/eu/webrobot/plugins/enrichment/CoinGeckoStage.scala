@@ -1,8 +1,7 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.{WArgs, WebroStageContext}
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
@@ -14,27 +13,18 @@ import scala.util.Try
  * Pipeline YAML:
  * {{{
  * - stage: coinGecko
- *   args:
- *     - "coin"        # coin-id column (default "coin")
+ *   args: [{ on: coin }]   # coin-id column (default "coin")
  * }}}
  * Adds coin_price_usd, coin_mcap, coin_volume, coin_change24h.
  */
-class CoinGeckoStage extends WPartitionStage {
+class CoinGeckoStage extends KeyedEnricher {
 
   override def name: String = "coinGecko"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "coin")
-    val cache = mutable.Map.empty[String, Map[String, Any]]
-    rows.map { row =>
-      val id = row.str(field).getOrElse("").trim.toLowerCase
-      if (id.isEmpty) row
-      else {
-        val d = cache.getOrElseUpdate(id, Try(CoinGeckoStage.fetch(id, ctx)).getOrElse(Map.empty))
-        d.foldLeft(row) { case (r, (k, v)) => r.set(k, v) }
-      }
-    }
-  }
+  override protected def defaultKey: String = "coin"
+
+  override protected def enrich(key: String, args: WArgs, ctx: WebroStageContext): Map[String, Any] =
+    CoinGeckoStage.fetch(key.toLowerCase, ctx)
 }
 
 object CoinGeckoStage {

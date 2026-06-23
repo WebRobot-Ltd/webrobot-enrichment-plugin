@@ -1,8 +1,7 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.{WArgs, WebroStageContext}
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
@@ -12,27 +11,18 @@ import scala.util.Try
  * Pipeline YAML:
  * {{{
  * - stage: censusGeocode
- *   args:
- *     - "address"     # US address column (default "address")
+ *   args: [{ on: address }]   # US address column (default "address")
  * }}}
  * Adds cg_lat, cg_lon, cg_matched.
  */
-class CensusGeocodeStage extends WPartitionStage {
+class CensusGeocodeStage extends KeyedEnricher {
 
   override def name: String = "censusGeocode"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = args.string(0, "address")
-    val cache = mutable.Map.empty[String, Map[String, Any]]
-    rows.map { row =>
-      val addr = row.str(field).getOrElse("").trim
-      if (addr.isEmpty) row
-      else {
-        val g = cache.getOrElseUpdate(addr, Try(CensusGeocodeStage.fetch(addr, ctx)).getOrElse(Map.empty))
-        g.foldLeft(row) { case (r, (k, v)) => r.set(k, v) }
-      }
-    }
-  }
+  override protected def defaultKey: String = "address"
+
+  override protected def enrich(key: String, args: WArgs, ctx: WebroStageContext): Map[String, Any] =
+    CensusGeocodeStage.fetch(key, ctx)
 }
 
 object CensusGeocodeStage {

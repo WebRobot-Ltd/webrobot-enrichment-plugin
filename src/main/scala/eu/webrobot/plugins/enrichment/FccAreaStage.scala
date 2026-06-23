@@ -1,41 +1,35 @@
 package eu.webrobot.plugins.enrichment
 
-import eu.webrobot.plugin.sdk.{WArgs, WPartitionStage, WRow, WebroStageContext}
+import eu.webrobot.plugin.sdk.{WArgs, WRow, WebroStageContext}
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
  * FCC Census Area enrichment — FREE, no API key. Maps a US lat/lon to its census geography: county FIPS,
- * state and county name (and the 15-digit census block). Pairs with geocode/censusGeocode to attach US
- * administrative codes for joins to Census/BLS data.
+ * state and county name (and the 15-digit census block). A SPATIAL join on a composite (lat, lon) key —
+ * modeled on [[RowEnricher]] (the criterion is point-contains, resolved server-side by the FCC API).
  *
  * Pipeline YAML:
  * {{{
  * - stage: fccArea
- *   args:
- *     - "geo_lat"     # latitude column  (default "geo_lat")
- *     - "geo_lon"     # longitude column (default "geo_lon")
+ *   args: [{ lat: geo_lat, lon: geo_lon }]   # or positional ["geo_lat", "geo_lon"]
  * }}}
  * Adds fcc_county_fips, fcc_state, fcc_county, fcc_block_fips.
  */
-class FccAreaStage extends WPartitionStage {
+class FccAreaStage extends RowEnricher {
 
   override def name: String = "fccArea"
 
-  override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val latF = args.string(0, "geo_lat")
-    val lonF = args.string(1, "geo_lon")
-    val cache = mutable.Map.empty[String, Map[String, Any]]
-    rows.map { row =>
-      val lat = row.str(latF).getOrElse("").trim
-      val lon = row.str(lonF).getOrElse("").trim
-      if (lat.isEmpty || lon.isEmpty) row
-      else {
-        val d = cache.getOrElseUpdate(s"$lat,$lon", Try(FccAreaStage.fetch(lat, lon, ctx)).getOrElse(Map.empty))
-        d.foldLeft(row) { case (r, (k, v)) => r.set(k, v) }
-      }
-    }
+  override protected def cacheKey(row: WRow, args: WArgs): String = {
+    val (latF, lonF) = FccAreaStage.cols(args)
+    val lat = row.str(latF).getOrElse("").trim
+    val lon = row.str(lonF).getOrElse("").trim
+    if (lat.isEmpty || lon.isEmpty) "" else s"$lat,$lon"
+  }
+
+  override protected def enrich(row: WRow, args: WArgs, ctx: WebroStageContext): Map[String, Any] = {
+    val (latF, lonF) = FccAreaStage.cols(args)
+    FccAreaStage.fetch(row.str(latF).getOrElse("").trim, row.str(lonF).getOrElse("").trim, ctx)
   }
 }
 
@@ -44,6 +38,12 @@ object FccAreaStage {
   private val STATE       = """"state_code"\s*:\s*"(\w+)"""".r
   private val COUNTY_NAME = """"county_name"\s*:\s*"([^"]+)"""".r
   private val BLOCK       = """"block_fips"\s*:\s*"(\d+)"""".r
+
+  /** (latCol, lonCol) from the YAML map form {lat,lon} or positional args(0),(1). */
+  def cols(args: WArgs): (String, String) = {
+    val s = JoinSpec.from(args, "")
+    (s.extra("lat", args.string(0, "geo_lat")), s.extra("lon", args.string(1, "geo_lon")))
+  }
 
   def fetch(lat: String, lon: String, ctx: WebroStageContext): Map[String, Any] = {
     val url = s"https://geo.fcc.gov/api/census/area?lat=${enc(lat)}&lon=${enc(lon)}&format=json"

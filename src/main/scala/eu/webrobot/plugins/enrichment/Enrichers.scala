@@ -16,20 +16,26 @@ import scala.util.Try
  * (e.g. ONNX sentiment via the runtime-provided onnxruntime), ctx.llm, or pure local logic (lexicon).
  */
 
-/** Augment each row by a SINGLE key column (the common case: country, coin, protocol, address, …). */
+/**
+ * Equi-join enricher: augment each row by a SINGLE key column (country, coin, protocol, address, …).
+ * The key column is the join `on` of the YAML formalism — `args: [{ on: <col>, …extras }]` or positional
+ * `["<col>"]`. A concrete stage declares the default key column and the per-key `enrich`; the trait handles
+ * the per-partition de-dup cache, the empty-key skip, failure isolation, and the row.set.
+ */
 trait KeyedEnricher extends WPartitionStage {
 
-  /** the row column whose trimmed value is the lookup key (read from args). */
-  protected def keyField(args: WArgs): String
+  /** default key column when the YAML omits `on` (also the positional arg(0) name). */
+  protected def defaultKey: String
 
-  /** columns to add for one key value (cached once per distinct key). Empty map ⇒ leave the row as-is. */
+  /** columns to add for one key value (cached once per distinct key). Empty map ⇒ leave the row as-is.
+   * Read any stage-specific extras from `args` (map form `JoinSpec.from(args,…).extra(name)` or positional). */
   protected def enrich(key: String, args: WArgs, ctx: WebroStageContext): Map[String, Any]
 
   final override def transformPartition(rows: Iterator[WRow], args: WArgs, ctx: WebroStageContext): Iterator[WRow] = {
-    val field = keyField(args)
+    val on    = JoinSpec.from(args, defaultKey).on
     val cache = mutable.Map.empty[String, Map[String, Any]]
     rows.map { row =>
-      val key = row.str(field).map(_.trim).getOrElse("")
+      val key = row.str(on).map(_.trim).getOrElse("")
       if (key.isEmpty) row
       else Enrichers.augment(row, cache.getOrElseUpdate(key, Enrichers.safe(enrich(key, args, ctx))))
     }
