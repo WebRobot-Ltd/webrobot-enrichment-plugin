@@ -130,18 +130,35 @@ PY
   "description": "Enrichment su fonti pubbliche gratuite, nessuna chiave API - Build ${BUILD_NUMBER}"
 }
 EOF
+                          # La chiave NON passa dalla riga di comando: Jenkins traccia i comandi con
+                          # set -x, e API_ADMIN_KEY e' un parametro semplice, non una credenziale
+                          # mascherata — finiva quindi in chiaro nel log della console, leggibile da
+                          # chiunque abbia accesso a Jenkins. Qui va in un file di configurazione di
+                          # curl scritto con la tracciatura spenta.
+                          set +x
+                          umask 077
+                          printf 'header = "X-API-Key: %s"\n' "${API_ADMIN_KEY}" > /tmp/curl-auth.cfg
+                          set -x
+
                           echo "🔌 Registering via ${API_ENDPOINT}/api/webrobot/api/admin/plugin-installations ..."
-                          HTTP_CODE=$(curl -s -X POST "${API_ENDPOINT}/api/webrobot/api/admin/plugin-installations" \
-                            -H "X-API-Key: ${API_ADMIN_KEY}" -H "Content-Type: application/json" \
+                          HTTP_CODE=$(curl -s -K /tmp/curl-auth.cfg -X POST "${API_ENDPOINT}/api/webrobot/api/admin/plugin-installations" \
+                            -H "Content-Type: application/json" \
                             -d @/tmp/payload.json -o /tmp/resp.json -w "%{http_code}")
                           echo "HTTP ${HTTP_CODE}: $(cat /tmp/resp.json 2>/dev/null)"
                           if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "201" ]; then
                             PLUGIN_DB_ID=$(grep -o '"id":[^,}]*' /tmp/resp.json | head -1 | cut -d':' -f2 | tr -d ' ')
                             if [ "${ENABLE_PLUGIN}" = "true" ] && [ -n "${PLUGIN_DB_ID}" ]; then
-                              curl -s -X POST "${API_ENDPOINT}/webrobot/api/admin/plugin-installations/${PLUGIN_DB_ID}/enable" \
-                                -H "X-API-Key: ${API_ADMIN_KEY}" -w "\nenable HTTP %{http_code}\n" || true
+                              # ⚠️ Il prefisso e' /api/webrobot/api/... come nella registrazione qui sopra.
+                              # Senza il primo /api questa chiamata ha sempre restituito 404, e con
+                              # `|| true` in coda il fallimento non fermava nulla: l'abilitazione via
+                              # pipeline non ha quindi mai funzionato, ed e' anche la ragione per cui la
+                              # sincronizzazione degli stage non e' mai partita da qui.
+                              curl -s -K /tmp/curl-auth.cfg -X POST "${API_ENDPOINT}/api/webrobot/api/admin/plugin-installations/${PLUGIN_DB_ID}/enable" \
+                                -w "\nenable HTTP %{http_code}\n" || true
                             fi
+                            rm -f /tmp/curl-auth.cfg
                           else
+                            rm -f /tmp/curl-auth.cfg
                             echo "⚠️ registration failed (jar+manifest ARE uploaded — register/enable via the marketplace API later)"
                           fi
                         else
