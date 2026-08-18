@@ -56,8 +56,11 @@ spec:
                     sh '''
                         echo "📦 Building ${PLUGIN_ID}-${PLUGIN_VERSION} against published webrobot-plugin-sdk..."
                         # the gradle-playwright agent has gradle on PATH (same as the ETL Jenkinsfile) — no wrapper needed
-                        GITHUB_ACTOR="${GITHUB_USR}" GITHUB_TOKEN="${GITHUB_PSW}" gradle --no-daemon clean jar
+                        GITHUB_ACTOR="${GITHUB_USR}" GITHUB_TOKEN="${GITHUB_PSW}" gradle --no-daemon clean jar generateManifest
                         ls -lh build/libs/
+                        # generateManifest fallisce se uno stage del codice non e' dichiarato:
+                        # meglio fermarsi qui che pubblicare un catalogo incompleto in silenzio.
+                        ls -l build/${PLUGIN_ID}-manifest.json
                     '''
                 }
             }
@@ -81,18 +84,28 @@ spec:
                         echo "⬆️  Uploading ${PLUGIN_JAR} → ${DEST}"
                         /tmp/mc cp "${PLUGIN_JAR}" "${DEST}" --insecure
 
-                        # Manifest (metadata; the stages themselves are discovered from the jar via ServiceLoader)
-                        cat > /tmp/manifest.json << EOF
-{
-  "pluginId": "${PLUGIN_ID}",
-  "version": "${PLUGIN_VERSION}",
-  "description": "Free public-data enrichment stages: landRegistry (UK sold-price comparables), gdelt (news tone)",
-  "buildNumber": ${BUILD_NUMBER},
-  "buildType": "${BUILD_TYPE}",
-  "stages": ["landRegistry", "gdelt"],
-  "enabled": ${ENABLE_PLUGIN}
-}
-EOF
+                        # Manifest.
+                        #
+                        # ⚠️ Qui prima c'era un heredoc con "stages": ["landRegistry","gdelt"] — un elenco di
+                        # STRINGHE. Il sincronizzatore della piattaforma si aspetta invece oggetti StageSpec
+                        # (stage_name, aliases, arg_schema, description), quindi non riusciva a leggerne
+                        # nessuno: il plugin risultava installato e attivo, ma i suoi stage non comparivano
+                        # nel catalogo — e un catalogo incompleto non da' errore, semplicemente non mostra
+                        # nulla. L'elenco era anche fermo a 2 stage su 31.
+                        #
+                        # Il commento accanto diceva "the stages are discovered from the jar via
+                        # ServiceLoader": vero per l'ESECUZIONE, non per il CATALOGO, che si alimenta solo
+                        # da questo file. Ora il manifest lo genera la build dalle sorgenti Scala.
+                        python3 - "build/${PLUGIN_ID}-manifest.json" "${BUILD_NUMBER}" "${BUILD_TYPE}" "${ENABLE_PLUGIN}" <<'PY'
+import json, sys
+percorso, build_number, build_type, enabled = sys.argv[1:5]
+m = json.load(open(percorso))
+m["buildNumber"] = int(build_number)
+m["buildType"] = build_type
+m["enabled"] = enabled.lower() == "true"
+json.dump(m, open("/tmp/manifest.json", "w"), indent=2, ensure_ascii=False)
+print(f'manifest: {len(m["stages"])} stage')
+PY
                         /tmp/mc cp /tmp/manifest.json "${MINIO_ALIAS}/${MINIO_BUCKET}/jars/${BUILD_TYPE}/plugins/${PLUGIN_ID}-manifest.json" --insecure
 
                         # Register with the marketplace — SAME endpoint/payload the ETL Jenkinsfile uses

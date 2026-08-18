@@ -1,0 +1,521 @@
+[
+  {
+    "stage_name": "bancaItalia",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "field",
+        "type": "string",
+        "required": false,
+        "default": "key",
+        "description": "key column (default \"key\")"
+      },
+      {
+        "name": "flow",
+        "type": "string",
+        "required": true,
+        "description": "Infostat dataflow id"
+      },
+      {
+        "name": "keyTpl",
+        "type": "string",
+        "required": false,
+        "default": "{code}",
+        "description": "SDMX key template; {code} -> key value"
+      },
+      {
+        "name": "outCol",
+        "type": "string",
+        "required": false,
+        "default": "bdi_value",
+        "description": "output column (default \"bdi_value\")"
+      },
+      {
+        "name": "base",
+        "type": "string",
+        "required": false,
+        "default": "https://infostat.bancaditalia.it/inquiry/api/sdmx21/v2"
+      }
+    ],
+    "description": "Banca d'Italia (Infostat SDMX 2.1) enrichment — FREE, no API key. Adds a Banca d'Italia indicator value (latest observation) to each row keyed by a code, via a generic dataflow + key TEMPLATE ({code}).",
+    "usage_guide": "- stage: bancaItalia\n  args:\n    - \"key\"                # key column (default \"key\")\n    - \"BIP_PUB__BPM6\"      # Infostat dataflow id\n    - \"M.{code}....\"       # SDMX key template; {code} -> key value\n    - \"bdi_value\"          # output column (default \"bdi_value\")"
+  },
+  {
+    "stage_name": "binanceFunding",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "Binance USDT-M futures positioning enrichment — FREE, no API key. Adds the funding rate and open interest for a perpetual symbol to each row — derivatives-market positioning, a leading risk/timing signal for a crypto portfolio (extreme funding / OI = crowded trade).",
+    "usage_guide": "- stage: binanceFunding\n  args:\n    - \"symbol\"      # perp symbol column, e.g. BTCUSDT (default \"symbol\")\n    - \"date\"        # date column YYYY-MM-DD for point-in-time (default \"date\"; missing → latest)"
+  },
+  {
+    "stage_name": "censusGeocode",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "US Census geocoder enrichment — FREE, no API key. Resolves a US street address to coordinates + the official matched address. Pairs with the fccArea stage (coords → FIPS) for US-territory joins.",
+    "usage_guide": "- stage: censusGeocode\n  args: [{ on: address }]   # US address column (default \"address\")"
+  },
+  {
+    "stage_name": "chainTvl",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "DefiLlama chain-TVL enrichment — FREE, no API key. Total DeFi TVL (USD) of a blockchain, joined to each row by chain name. Modeled as an as-of JOIN (see [[AsOfEnricher]]): with an `asof` column it returns the chain TVL as of that day (backward, no look-ahead); otherwise the latest. Macro DeFi risk-regime signal.",
+    "usage_guide": "- stage: chainTvl\n  args: [{ on: chain, asof: date }]   # or positional [\"chain\", \"date\"]"
+  },
+  {
+    "stage_name": "coinGecko",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "CoinGecko market-data enrichment — FREE, no API key. Adds current price, market cap, 24h volume and 24h change to each row keyed by a CoinGecko coin id (e.g. \"bitcoin\", \"ethereum\"). LIVE data — for point-in-time historical price in a backtest use the `binancePrice` stage (CoinGecko's history endpoint is key-gated).",
+    "usage_guide": "- stage: coinGecko\n  args: [{ on: coin }]   # coin-id column (default \"coin\")"
+  },
+  {
+    "stage_name": "countryInfo",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "field",
+        "type": "string",
+        "required": false,
+        "default": "country",
+        "description": "ISO2/ISO3 country-code column (default \"country\")"
+      }
+    ],
+    "description": "Country metadata enrichment — FREE, no API key (World Bank country endpoint). Adds region, income group, capital and capital coordinates to each row keyed by an ISO country code. A reliable, key-less replacement for the deprecated restcountries.com.",
+    "usage_guide": "- stage: countryInfo\n  args:\n    - \"country\"     # ISO2/ISO3 country-code column (default \"country\")"
+  },
+  {
+    "stage_name": "defiLlama",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "DefiLlama protocol-TVL enrichment — FREE, no API key. A protocol's Total Value Locked (USD), joined to each row by the DefiLlama protocol slug. Modeled as an as-of JOIN (see [[AsOfEnricher]]): with an `asof` column it returns the TVL as of that day (backward, no look-ahead — `None`/untouched when the date precedes the protocol's history, never a fabricated future value); otherwise the latest TVL.",
+    "usage_guide": "- stage: defiLlama\n  args: [{ on: protocol, asof: date }]   # or positional [\"protocol\", \"date\"]"
+  },
+  {
+    "stage_name": "eurostat",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "field",
+        "type": "string",
+        "required": false,
+        "default": "geo",
+        "description": "geo/NUTS code column (default \"geo\")"
+      },
+      {
+        "name": "dataset",
+        "type": "string",
+        "required": true,
+        "description": "Eurostat dataset code"
+      },
+      {
+        "name": "outCol",
+        "type": "string",
+        "required": false,
+        "default": "eurostat_value",
+        "description": "output column (default \"eurostat_value\")"
+      },
+      {
+        "name": "extra",
+        "type": "string",
+        "required": true,
+        "description": "extra filter query appended verbatim (optional; include leading '&')"
+      }
+    ],
+    "description": "Eurostat enrichment — FREE, no API key. Adds a Eurostat indicator value (latest time period) to each row keyed by a geo code (country ISO2 or NUTS region). Complements ISTAT on an EU-wide scale (regional GDP, unemployment, prices, ...). Generic: pass the Eurostat dataset code + optional extra filter query.",
+    "usage_guide": "- stage: eurostat\n  args:\n    - \"geo\"                # geo/NUTS code column (default \"geo\")\n    - \"nama_10r_2gdp\"      # Eurostat dataset code\n    - \"eurostat_value\"     # output column (default \"eurostat_value\")\n    - \"&unit=MIO_EUR\"      # extra filter query appended verbatim (optional; include leading '&')"
+  },
+  {
+    "stage_name": "fccArea",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "arg0",
+        "type": "string",
+        "required": false,
+        "default": "geo_lat"
+      },
+      {
+        "name": "arg1",
+        "type": "string",
+        "required": false,
+        "default": "geo_lon"
+      }
+    ],
+    "description": "FCC Census Area enrichment — FREE, no API key. Maps a US lat/lon to its census geography: county FIPS, state and county name (and the 15-digit census block). A SPATIAL join on a composite (lat, lon) key — modeled on [[RowEnricher]] (the criterion is point-contains, resolved server-side by the FCC API).",
+    "usage_guide": "- stage: fccArea\n  args: [{ lat: geo_lat, lon: geo_lon }]   # or positional [\"geo_lat\", \"geo_lon\"]"
+  },
+  {
+    "stage_name": "fearGreed",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "Crypto Fear & Greed Index enrichment — FREE, no API key (alternative.me). A KEYLESS as-of join: the right side is one global daily series (no entity key), joined to each row by date. With an `asof` column it returns the index AS OF that day (backward, no look-ahead via [[AsOf.pick]]); otherwise the latest value.",
+    "usage_guide": "- stage: fearGreed\n  args: [{ asof: date }]   # or positional [\"date\"]"
+  },
+  {
+    "stage_name": "frankfurter",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "dateField",
+        "type": "string",
+        "required": false,
+        "default": "date",
+        "description": "date column YYYY-MM-DD (default \"date\"; \"\" or missing → latest)"
+      },
+      {
+        "name": "base",
+        "type": "string",
+        "required": false,
+        "default": "EUR",
+        "description": "base currency (default \"EUR\")"
+      },
+      {
+        "name": "target",
+        "type": "string",
+        "required": false,
+        "default": "USD",
+        "description": "target currency (default \"USD\")"
+      }
+    ],
+    "description": "Frankfurter (ECB reference rates) FX enrichment — FREE, no API key. Adds the exchange rate base→target to each row, observed on the row's date (point-in-time, no look-ahead). With no date column, uses the latest rate.",
+    "usage_guide": "- stage: frankfurter\n  args:\n    - \"date\"        # date column YYYY-MM-DD (default \"date\"; \"\" or missing → latest)\n    - \"EUR\"         # base currency (default \"EUR\")\n    - \"USD\"         # target currency (default \"USD\")"
+  },
+  {
+    "stage_name": "fred",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "series",
+        "type": "string",
+        "required": true,
+        "description": "FRED series id (e.g. Real GDP)"
+      },
+      {
+        "name": "dateField",
+        "type": "string",
+        "required": false,
+        "default": "date",
+        "description": "date column (YYYY-MM-DD) for point-in-time, or \"\" for latest (default \"date\")"
+      },
+      {
+        "name": "outCol",
+        "type": "string",
+        "required": false,
+        "default": "fred_value",
+        "description": "output column (default \"fred_value\")"
+      },
+      {
+        "name": "a",
+        "type": "string",
+        "required": true,
+        "description": "api_key (optional; default reads env FRED_API_KEY)"
+      }
+    ],
+    "description": "FRED (St. Louis Fed) enrichment — US macro time series. Requires a FREE API key (env `FRED_API_KEY`, or passed as the last arg). Adds the value of a FRED series to each row, observed at/just-before the row's date (point-in-time, no look-ahead). With no date column, adds the latest available value to all rows.",
+    "usage_guide": "- stage: fred\n  args:\n    - \"GDPC1\"          # FRED series id (e.g. Real GDP)\n    - \"date\"           # date column (YYYY-MM-DD) for point-in-time, or \"\" for latest (default \"date\")\n    - \"fred_value\"     # output column (default \"fred_value\")\n    - \"\"               # api_key (optional; default reads env FRED_API_KEY)"
+  },
+  {
+    "stage_name": "gdelt",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "query",
+        "type": "string",
+        "required": true,
+        "description": "GDELT query"
+      },
+      {
+        "name": "days",
+        "type": "number",
+        "required": false,
+        "default": "180",
+        "description": "days back from today (default 180)"
+      },
+      {
+        "name": "mode",
+        "type": "string",
+        "required": false,
+        "default": "timelinetone",
+        "description": "timelinetone (tone) | timelinevol (article volume)"
+      },
+      {
+        "name": "asCol",
+        "type": "string",
+        "required": true,
+        "description": "output column name (default: tone / volume)"
+      }
+    ],
+    "description": "GDELT DOC 2.0 news-tone SOURCE stage — FREE, no API key, point-in-time (the tone of day D reflects only news published up to D). Produces one row per day: [date, query, tone|volume]. The dogfood news signal — a WebRobot pipeline turns daily world-news sentiment into rows it can join/aggregate.",
+    "usage_guide": "- stage: gdelt\n  args:\n    - \"Bitcoin OR BTC\"     # GDELT query\n    - 180                  # days back from today (default 180)\n    - \"timelinetone\"       # timelinetone (tone) | timelinevol (article volume)\n    - \"tone\"               # output column name (default: tone / volume)"
+  },
+  {
+    "stage_name": "geocode",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "field",
+        "type": "string",
+        "required": false,
+        "default": "address",
+        "description": "address column (default \"address\")"
+      },
+      {
+        "name": "prefix",
+        "type": "string",
+        "required": false,
+        "default": "geo_",
+        "description": "output column prefix (default \"geo_\")"
+      },
+      {
+        "name": "base",
+        "type": "string",
+        "required": false,
+        "default": "https://nominatim.openstreetmap.org",
+        "description": "base URL (default public; override for self-hosted)"
+      }
+    ],
+    "description": "OpenStreetMap Nominatim geocoding enrichment — FREE, no API key. Turns a free-text address into coordinates + administrative areas (city/county/state/postcode/country). The georeferencing primitive: feeds downstream territorial joins (e.g. resolve a listing's address → comune/NUTS code → ISTAT/Eurostat).",
+    "usage_guide": "- stage: geocode\n  args:\n    - \"address\"                                  # address column (default \"address\")\n    - \"geo_\"                                     # output column prefix (default \"geo_\")\n    - \"https://nominatim.openstreetmap.org\"      # base URL (default public; override for self-hosted)"
+  },
+  {
+    "stage_name": "gleif",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "GLEIF (Global Legal Entity Identifier) enrichment — FREE, no API key. Resolves a company legal name to its LEI + registration status + legal jurisdiction. B2B / fintech / KYC enrichment.",
+    "usage_guide": "- stage: gleif\n  args: [{ on: company }]   # legal-name column (default \"company\")"
+  },
+  {
+    "stage_name": "httpSource",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "httpSource — a GENERIC, declarative HTTP/JSON source the AGENT programs from the pipeline YAML, with NO Scala build. The upstream (\"a monte\") counterpart of python_row_transform: instead of hard-coding a Scala stage per REST API, the agent supplies a spec (URL + per-field extraction) and this producer fetches and emits rows. Zero-dependency — extraction is regex (capture group 1), the same proven approach as the curated enrichers; a JSONPath variant belongs in a core stage where a JSON lib is available.",
+    "usage_guide": "- stage: httpSource\n  args:\n    - url: \"https://api.the-odds-api.com/v4/sports/soccer_epl/odds?regions=eu&markets=h2h&apiKey=${THEODDS_API_KEY}\"\n      headers: { Accept: application/json }          # optional; ${ENV} expanded in url + header values\n      record: '\\{\"id\":\"[^\"]+\".*?\"bookmakers\":\\[.*?\\]\\}'   # optional regex splitting body into N records\n      fields:                                        # name -> regex (capture group 1) applied per record\n        event_id:  '\"id\":\"([^\"]+)\"'\n        home_team: '\"home_team\":\"([^\"]+)\"'\n        away_team: '\"away_team\":\"([^\"]+)\"'\n      timeout: 30000"
+  },
+  {
+    "stage_name": "istat",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "field",
+        "type": "string",
+        "required": false,
+        "default": "territory",
+        "description": "column holding the ISTAT territory code (default \"territory\")"
+      },
+      {
+        "name": "flow",
+        "type": "string",
+        "required": true,
+        "description": "ISTAT SDMX dataflow id"
+      },
+      {
+        "name": "keyTpl",
+        "type": "string",
+        "required": false,
+        "default": "{code}",
+        "description": "SDMX key template; {code} → territory code (dot-separated dimensions)"
+      },
+      {
+        "name": "outCol",
+        "type": "string",
+        "required": false,
+        "default": "istat_value",
+        "description": "output column (default \"istat_value\")"
+      },
+      {
+        "name": "base",
+        "type": "string",
+        "required": false,
+        "default": "https://esploradati.istat.it/SDMXWS/rest"
+      }
+    ],
+    "description": "ISTAT (Italian National Statistics) SDMX enrichment — FREE, no API key. Adds an ISTAT indicator value (latest observation) to each row keyed by an ISTAT territory code (comune / provincia / regione). Italian territorial ground-truth for real-estate arbitrage & market intelligence (population, income, prices, ...). Generic by design: you pass the SDMX dataflow id and a key TEMPLATE in which `{code}` is replaced by the row's territory code, so any ISTAT dataflow is reachable without code changes.",
+    "usage_guide": "- stage: istat\n  args:\n    - \"territory\"          # column holding the ISTAT territory code (default \"territory\")\n    - \"22_289\"             # ISTAT SDMX dataflow id\n    - \"A.{code}.JAN.99.9\"  # SDMX key template; {code} → territory code (dot-separated dimensions)\n    - \"istat_value\"        # output column (default \"istat_value\")"
+  },
+  {
+    "stage_name": "landRegistry",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "pcField",
+        "type": "string",
+        "required": false,
+        "default": "postcode",
+        "description": "the postcode column (default \"postcode\")"
+      },
+      {
+        "name": "limit",
+        "type": "number",
+        "required": false,
+        "default": "100",
+        "description": "max sold records per postcode (default 100)"
+      }
+    ],
+    "description": "HM Land Registry SOLD-price enrichment — FREE, no API key (Open Government Licence). Adds per-postcode SOLD comparables to each property row: the real-estate arbitrage ground-truth — a listing's asking price vs the recent SOLD prices in the SAME postcode (asking ≪ sold_median = real underpricing, not just vs other asking prices).",
+    "usage_guide": "- stage: landRegistry\n  args:\n    - \"postcode\"           # the postcode column (default \"postcode\")\n    - 100                  # max sold records per postcode (default 100)"
+  },
+  {
+    "stage_name": "llamaFees",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "arg2",
+        "type": "string",
+        "required": false,
+        "default": "dailyFees",
+        "description": "dataType: dailyFees | dailyRevenue (default \"dailyFees\")"
+      }
+    ],
+    "description": "DefiLlama protocol fees & revenue enrichment — FREE, no API key. Fees/revenue are a protocol's on-chain \"earnings\" — the basis for fundamental token valuation (price-to-fees / price-to-revenue).",
+    "usage_guide": "- stage: llamaFees\n  args:\n    - \"protocol\"    # protocol-slug column (default \"protocol\")\n    - \"date\"        # date column YYYY-MM-DD for point-in-time (default \"date\"; missing → current)\n    - \"dailyFees\"   # dataType: dailyFees | dailyRevenue (default \"dailyFees\")"
+  },
+  {
+    "stage_name": "llamaPrice",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "DefiLlama token-price enrichment — FREE, no API key, with KEY-LESS HISTORICAL support (the differentiator vs CoinGecko, whose history endpoint is key-gated). Adds the USD price of a token to each row, observed AS OF the row's date (point-in-time, no look-ahead) when a date column is present, else the current price.",
+    "usage_guide": "- stage: llamaPrice\n  args:\n    - \"token\"       # token-id column (default \"token\"; e.g. coingecko:bitcoin)\n    - \"date\"        # date column YYYY-MM-DD for point-in-time (default \"date\"; missing → current)"
+  },
+  {
+    "stage_name": "oecd",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "field",
+        "type": "string",
+        "required": false,
+        "default": "country",
+        "description": "key column (default \"country\")"
+      },
+      {
+        "name": "flow",
+        "type": "string",
+        "required": true,
+        "description": "SDMX dataflow id"
+      },
+      {
+        "name": "keyTpl",
+        "type": "string",
+        "required": false,
+        "default": "{code}",
+        "description": "SDMX key template; {code} -> key value"
+      },
+      {
+        "name": "outCol",
+        "type": "string",
+        "required": false,
+        "default": "oecd_value",
+        "description": "output column (default \"oecd_value\")"
+      },
+      {
+        "name": "base",
+        "type": "string",
+        "required": false,
+        "default": "https://sdmx.oecd.org/public/rest/data"
+      }
+    ],
+    "description": "OECD SDMX enrichment — FREE, no API key. Adds an OECD indicator value (latest observation) to each row keyed by a code (typically an ISO country code). Generic: pass the SDMX dataflow + a key TEMPLATE with `{code}` substituted by the row's key, so any OECD dataflow is reachable without code changes.",
+    "usage_guide": "- stage: oecd\n  args:\n    - \"country\"            # key column (default \"country\")\n    - \"OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0\"  # SDMX dataflow id\n    - \"{code}.M.IRSTCI.....\"  # SDMX key template; {code} -> key value\n    - \"oecd_value\"         # output column (default \"oecd_value\")"
+  },
+  {
+    "stage_name": "openMeteo",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "latF",
+        "type": "string",
+        "required": false,
+        "default": "geo_lat",
+        "description": "latitude column  (default \"geo_lat\")"
+      },
+      {
+        "name": "lonF",
+        "type": "string",
+        "required": false,
+        "default": "geo_lon",
+        "description": "longitude column (default \"geo_lon\")"
+      }
+    ],
+    "description": "Open-Meteo current-weather enrichment — FREE, no API key. Adds current temperature, wind speed and weather code to each row keyed by latitude/longitude (pairs naturally with the geocode stage).",
+    "usage_guide": "- stage: openMeteo\n  args:\n    - \"geo_lat\"     # latitude column  (default \"geo_lat\")\n    - \"geo_lon\"     # longitude column (default \"geo_lon\")"
+  },
+  {
+    "stage_name": "overpass",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "arg0",
+        "type": "string",
+        "required": false,
+        "default": "geo_lat"
+      },
+      {
+        "name": "arg1",
+        "type": "string",
+        "required": false,
+        "default": "geo_lon"
+      },
+      {
+        "name": "arg2",
+        "type": "string",
+        "required": false,
+        "default": "amenity=hospital"
+      },
+      {
+        "name": "arg3",
+        "type": "number",
+        "required": false,
+        "default": "1000"
+      },
+      {
+        "name": "arg4",
+        "type": "string",
+        "required": false,
+        "default": "osm_count"
+      },
+      {
+        "name": "arg5",
+        "type": "string",
+        "required": false,
+        "default": "https://overpass-api.de/api/interpreter"
+      }
+    ],
+    "description": "OpenStreetMap Overpass enrichment — FREE, no API key (rate-limited). For each row with a lat/lon, counts nearby OSM features of a given key=value within a radius. A SPATIAL + AGGREGATE join on a composite (lat, lon, tag, radius) key — modeled on [[RowEnricher]] (the criterion is within-radius count).",
+    "usage_guide": "- stage: overpass\n  args: [{ lat: geo_lat, lon: geo_lon, tag: \"amenity=hospital\", radius: \"1000\", out: osm_count }]\n  # or positional [\"geo_lat\", \"geo_lon\", \"amenity=hospital\", 1000, \"osm_count\"]"
+  },
+  {
+    "stage_name": "secFundamentals",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "arg1",
+        "type": "string",
+        "required": false,
+        "default": "RevenueFromContractWithCustomerExcludingAssessedTax,EarningsPerShareDiluted,NetIncomeLoss"
+      }
+    ],
+    "description": "SEC EDGAR fundamentals enrichment — FREE, no API key. Joins each row (keyed by US stock ticker) to a company's reported financials (revenue, EPS, net income, …) from the SEC XBRL `companyconcept` API.",
+    "usage_guide": "- stage: secFundamentals\n  args: [{ on: ticker, asof: date,\n           concepts: \"RevenueFromContractWithCustomerExcludingAssessedTax,EarningsPerShareDiluted,NetIncomeLoss\" }]\n  # positional [\"ticker\",\"date\",\"<concepts csv>\"] also works; asof omitted ⇒ latest filed"
+  },
+  {
+    "stage_name": "stockPrice",
+    "aliases": [],
+    "arg_schema": [],
+    "description": "Equity historical price enrichment via the Alpaca Market Data API — the broker/market-data source for stock OHLCV (free key-less web sources are unusable from a datacenter: Stooq is JS-challenge-gated and Yahoo 429s the cluster IP). Joins each row by US ticker to that day's split-adjusted daily bar, as-of the row's date (backward, no look-ahead via [[AsOfEnricher]]) — the equity analog of llamaPrice. The same Alpaca account later drives live execution for the trading_player.",
+    "usage_guide": "- stage: stockPrice\n  args: [{ on: ticker, asof: date, start: \"2015-01-01\", adjustment: split }]\n  # positional [\"ticker\",\"date\"] also works; asof omitted ⇒ latest bar"
+  },
+  {
+    "stage_name": "worldBank",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "arg1",
+        "type": "string",
+        "required": false,
+        "default": "SP.POP.TOTL,NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG"
+      }
+    ],
+    "description": "World Bank Open Data enrichment — FREE, no API key. Adds country-level macro indicators to each row, keyed by an ISO country code (ISO2 or ISO3). Uses `mrnev=1` (most-recent non-empty value) so each row gets the latest available figure per indicator. Country-level macro context for global intelligence / cross-market normalization.",
+    "usage_guide": "- stage: worldBank\n  args: [{ on: country, indicators: \"SP.POP.TOTL,NY.GDP.PCAP.CD,FP.CPI.TOTL.ZG\" }]\n  # on: ISO2/ISO3 country-code column (default \"country\"); indicators: codes (default pop, GDP/cap, inflation)\n  # positional [\"country\", \"SP.POP.TOTL,...\"] still works"
+  }
+]
