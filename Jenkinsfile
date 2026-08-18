@@ -100,8 +100,11 @@ spec:
 import json, sys
 percorso, build_number, build_type, enabled = sys.argv[1:5]
 m = json.load(open(percorso))
-m["buildNumber"] = int(build_number)
-m["buildType"] = build_type
+# NIENTE buildNumber/buildType qui: PluginMetadata non li modella e NON ignora i campi sconosciuti,
+# quindi la loro sola presenza faceva fallire la deserializzazione dell'INTERO manifest —
+# "Unrecognized field buildNumber" — e con essa la pubblicazione di ogni stage. Il manifest li
+# conteneva da sempre: e' per questo che il catalogo non ha mai visto nulla di questo plugin.
+# Il numero di build resta comunque tracciato: sta nel nome del jar e nella riga di installazione.
 m["enabled"] = enabled.lower() == "true"
 json.dump(m, open("/tmp/manifest.json", "w"), indent=2, ensure_ascii=False)
 print(f'manifest: {len(m["stages"])} stage')
@@ -124,7 +127,7 @@ PY
   "manifestPath": "${MANIFEST_S3A}",
   "enabled": ${ENABLE_PLUGIN},
   "organizationId": null,
-  "description": "Free public-data enrichment: landRegistry (UK sold prices) + gdelt (news tone) - Build ${BUILD_NUMBER}"
+  "description": "Enrichment su fonti pubbliche gratuite, nessuna chiave API - Build ${BUILD_NUMBER}"
 }
 EOF
                           echo "🔌 Registering via ${API_ENDPOINT}/api/webrobot/api/admin/plugin-installations ..."
