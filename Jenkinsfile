@@ -78,7 +78,8 @@ spec:
                         MANIFEST_S3A="s3a://${MINIO_BUCKET}/jars/${BUILD_TYPE}/plugins/${PLUGIN_ID}-manifest.json"
 
                         # mc client
-                        [ -x /tmp/mc ] || ( wget -qO /tmp/mc https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x /tmp/mc )
+                        # dl.min.io risponde 410 Gone (MinIO ha ritirato i download pubblici): release fissata da GitHub, come la build ETL
+                        [ -x /tmp/mc ] || ( curl -fsSL --retry 3 --retry-delay 5 -o /tmp/mc https://github.com/minio/mc/releases/download/RELEASE.2025-08-13T08-35-41Z/mc.linux-amd64.RELEASE.2025-08-13T08-35-41Z && chmod +x /tmp/mc )
                         /tmp/mc alias set ${MINIO_ALIAS} ${MINIO_ENDPOINT} ${MINIO_USR} ${MINIO_PSW} --insecure
 
                         echo "⬆️  Uploading ${PLUGIN_JAR} → ${DEST}"
