@@ -133,9 +133,12 @@ object HttpSourceStage {
         }
         blocks.map { blk =>
           fields.foldLeft(WRow.empty) { case (row, (nm, rx)) =>
+            // every declared field is always a column (empty when the record lacks it): otherwise a field no
+            // record has — e.g. the winner of notices that are all still open — is no column at all, and the
+            // next sql_query fails on a column the pipeline itself declared
             rx.findFirstMatchIn(blk) match {
               case Some(m) => row.set(nm, if (m.groupCount >= 1) m.group(1) else m.matched)
-              case None    => row
+              case None    => row.set(nm, "")
             }
           }
         }.toVector
