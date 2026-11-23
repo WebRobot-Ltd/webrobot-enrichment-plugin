@@ -31,11 +31,13 @@ import scala.util.Try
  *     - "365d"         # from: YYYY-MM-DD, "<n>d" = n days ago (default "365d")
  *     - "today"        # to: YYYY-MM-DD or "today" (default)
  *     - 40             # max scene cloud cover % (default 40)
- *     - 30             # max passes per asset, most recent first (default 30)
+ *     - 30             # max passes per asset and window, most recent first (default 30)
+ *     - 0              # also the SAME window in the N previous years (seasonal baseline; default 0, max 5)
  * }}}
  * Adds sat_date, sat_scene, sat_cloud_pct, sat_valid_pct, sat_pixels, ndvi_mean, ndvi_p10, ndvi_p90,
- * ndwi_mean, ndmi_mean, nbr_mean, water_pct, sat_status, sat_source. A row with no usable pass is kept once
- * with sat_status explaining why (no_scenes, all_cloudy, error:…) and empty index columns.
+ * ndwi_mean, ndmi_mean, nbr_mean, water_pct, sat_status, sat_source, sat_window ("y0" = the requested window,
+ * "y-1" … "y-N" = the same dates N years earlier). A window with no usable pass is kept once with sat_status
+ * explaining why (no_scenes, all_cloudy, error:…) and empty index columns.
  */
 class SatelliteIndicesStage extends WPartitionStage {
 
@@ -49,21 +51,28 @@ class SatelliteIndicesStage extends WPartitionStage {
     val toDate       = args.string(4, "today")
     val maxCloud     = args.double(5, 40.0)
     val maxPasses    = args.int(6, 30)
+    val baselineYears = args.int(7, 0)
     val bufferM  = math.max(20.0, math.min(2000.0, bufferMetres))
     val from     = SatelliteIndicesStage.day(fromDate, LocalDate.now().minusDays(365))
     val to       = SatelliteIndicesStage.day(toDate, LocalDate.now())
     val maxScene = math.max(1, maxPasses)
+    val years    = math.max(0, math.min(5, baselineYears))
+    val windows  = (0 to years).map { k =>
+      (if (k == 0) "y0" else s"y-$k", LocalDate.parse(from).minusYears(k.toLong).toString, LocalDate.parse(to).minusYears(k.toLong).toString)
+    }
     val reader   = new SatelliteIndicesStage.CogReader()
     rows.flatMap { row =>
       val lat = row.double(latF)
       val lon = row.double(lonF)
       val out: Seq[Map[String, Any]] =
         if (lat.isEmpty || lon.isEmpty || lat.get.isNaN || lon.get.isNaN) Seq(SatelliteIndicesStage.status("no_coordinates"))
-        else Try(SatelliteIndicesStage.indices(lat.get, lon.get, bufferM, from, to, maxCloud, maxScene, reader, ctx))
-          .recover { case e: Throwable =>
-            ctx.warn(s"satelliteIndices ${lat.get},${lon.get}: ${e.getMessage}")
-            Seq(SatelliteIndicesStage.status("error:" + Option(e.getMessage).getOrElse(e.getClass.getSimpleName).take(120)))
-          }.get
+        else windows.flatMap { case (label, wFrom, wTo) =>
+          Try(SatelliteIndicesStage.indices(lat.get, lon.get, bufferM, wFrom, wTo, maxCloud, maxScene, reader, ctx))
+            .recover { case e: Throwable =>
+              ctx.warn(s"satelliteIndices ${lat.get},${lon.get} $label: ${e.getMessage}")
+              Seq(SatelliteIndicesStage.status("error:" + Option(e.getMessage).getOrElse(e.getClass.getSimpleName).take(120)))
+            }.get.map(_ + ("sat_window" -> label))
+        }
       out.map(cols => Enrichers.augment(row, cols))
     }
   }
@@ -82,7 +91,7 @@ object SatelliteIndicesStage {
   val CLEAR: Set[Int] = Set(4, 5, 6, 7)
 
   val COLUMNS: Seq[String] = Seq("sat_date", "sat_scene", "sat_cloud_pct", "sat_valid_pct", "sat_pixels", "ndvi_mean",
-    "ndvi_p10", "ndvi_p90", "ndwi_mean", "ndmi_mean", "nbr_mean", "water_pct", "sat_status", "sat_source")
+    "ndvi_p10", "ndvi_p90", "ndwi_mean", "ndmi_mean", "nbr_mean", "water_pct", "sat_status", "sat_source", "sat_window")
 
   /** "2026-01-31", "today", "<n>d" (n days ago) or "" → ISO date. */
   def day(spec: String, dflt: LocalDate): String = {

@@ -534,11 +534,18 @@
         "type": "number",
         "required": false,
         "default": "30",
-        "description": "max passes per asset, most recent first (default 30)"
+        "description": "max passes per asset and window, most recent first (default 30)"
+      },
+      {
+        "name": "baselineYears",
+        "type": "number",
+        "required": false,
+        "default": "0",
+        "description": "also the SAME window in the N previous years (seasonal baseline; default 0, max 5)"
       }
     ],
     "description": "Sentinel-2 spectral indices around each row's coordinates (vegetation, water, moisture, burn), one output row per cloud-free satellite pass — FREE, no API key.",
-    "usage_guide": "- stage: satelliteIndices\n  args:\n    - \"lat\"          # latitude column (WGS84)\n    - \"lon\"          # longitude column (WGS84)\n    - 250            # half side of the square around the point, metres (default 250, max 2000)\n    - \"365d\"         # from: YYYY-MM-DD, \"<n>d\" = n days ago (default \"365d\")\n    - \"today\"        # to: YYYY-MM-DD or \"today\" (default)\n    - 40             # max scene cloud cover % (default 40)\n    - 30             # max passes per asset, most recent first (default 30)"
+    "usage_guide": "- stage: satelliteIndices\n  args:\n    - \"lat\"          # latitude column (WGS84)\n    - \"lon\"          # longitude column (WGS84)\n    - 250            # half side of the square around the point, metres (default 250, max 2000)\n    - \"365d\"         # from: YYYY-MM-DD, \"<n>d\" = n days ago (default \"365d\")\n    - \"today\"        # to: YYYY-MM-DD or \"today\" (default)\n    - 40             # max scene cloud cover % (default 40)\n    - 30             # max passes per asset and window, most recent first (default 30)\n    - 0              # also the SAME window in the N previous years (seasonal baseline; default 0, max 5)"
   },
   {
     "stage_name": "secFundamentals",
