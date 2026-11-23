@@ -288,8 +288,8 @@
     "stage_name": "httpSource",
     "aliases": [],
     "arg_schema": [],
-    "description": "httpSource — a GENERIC, declarative HTTP/JSON source the AGENT programs from the pipeline YAML, with NO Scala build. The upstream (\"a monte\") counterpart of python_row_transform: instead of hard-coding a Scala stage per REST API, the agent supplies a spec (URL + per-field extraction) and this producer fetches and emits rows. Zero-dependency — extraction is regex (capture group 1), the same proven approach as the curated enrichers; a JSONPath variant belongs in a core stage where a JSON lib is available.",
-    "usage_guide": "- stage: httpSource\n  args:\n    - url: \"https://api.the-odds-api.com/v4/sports/soccer_epl/odds?regions=eu&markets=h2h&apiKey=${THEODDS_API_KEY}\"\n      headers: { Accept: application/json }          # optional; ${ENV} expanded in url + header values\n      record: '\\{\"id\":\"[^\"]+\".*?\"bookmakers\":\\[.*?\\]\\}'   # optional regex splitting body into N records\n      fields:                                        # name -> regex (capture group 1) applied per record\n        event_id:  '\"id\":\"([^\"]+)\"'\n        home_team: '\"home_team\":\"([^\"]+)\"'\n        away_team: '\"away_team\":\"([^\"]+)\"'\n      timeout: 30000"
+    "description": "httpSource — a GENERIC, declarative HTTP source the AGENT programs from the pipeline YAML, with NO Scala build: a JSON/REST API (GET or POST, paged) or an open-data bulk file (CSV, optionally zipped or gzipped, streamed). The upstream (\"a monte\") counterpart of python_row_transform: instead of hard-coding a Scala stage per source, the agent supplies a spec and this producer fetches and emits rows. Zero-dependency: JSON extraction is regex (capture group 1); CSV is parsed by a small streaming reader, so a file of hundreds of MB never sits in memory and `filter` drops the rows the job does not need before Spark sees them.",
+    "usage_guide": "# 1) JSON API, GET\n- stage: httpSource\n  args:\n    - url: \"https://api.the-odds-api.com/v4/sports/soccer_epl/odds?regions=eu&markets=h2h&apiKey=${THEODDS_API_KEY}\"\n      headers: { Accept: application/json }          # optional; ${ENV} expanded in url, body and header values\n      record: '\\{\"id\":\"[^\"]+\".*?\"bookmakers\":\\[.*?\\]\\}'   # optional regex splitting body into N records\n      fields:                                        # name -> regex (capture group 1) applied per record\n        event_id:  '\"id\":\"([^\"]+)\"'\n        home_team: '\"home_team\":\"([^\"]+)\"'\n      timeout: 30000\n# 2) JSON API, POST with paging ({page} is replaced by 1..pages; stops at the first page with no records)\n- stage: httpSource\n  args:\n    - url: \"https://api.ted.europa.eu/v3/notices/search\"\n      method: POST\n      body: '{\"query\":\"buyer-country=ITA AND classification-cpv=72*\",\"fields\":[\"publication-number\",\"notice-title\"],\"limit\":250,\"page\":{page}}'\n      pages: 20\n      record: '\\{\"publication-number\".*?\\}\\}'\n      fields: { publication_number: '\"publication-number\":\"([^\"]+)\"' }\n# 3) bulk CSV file(s), zipped or not, streamed and filtered\n- stage: httpSource\n  args:\n    - urls: [\"https://dati.anticorruzione.it/opendata/download/dataset/cig/filesystem/20261101-cig_csv.zip\"]\n      format: csv                 # zip/gz detected from the URL (or unzip: true / gzip: true)\n      delimiter: \";\"\n      columns: [cig, oggetto_gara, importo_lotto, cod_cpv, provincia, data_pubblicazione]   # optional subset\n      filter: { cod_cpv: '^72', provincia: 'MILANO|ROMA' }    # optional: column -> regex, all must match\n      limit: 0                    # optional max rows per file (0 = all)\n      sourceColumn: source_url    # optional: add the file URL to each row"
   },
   {
     "stage_name": "istat",
@@ -482,6 +482,63 @@
     ],
     "description": "OpenStreetMap Overpass enrichment — FREE, no API key (rate-limited). For each row with a lat/lon, counts nearby OSM features of a given key=value within a radius. A SPATIAL + AGGREGATE join on a composite (lat, lon, tag, radius) key — modeled on [[RowEnricher]] (the criterion is within-radius count).",
     "usage_guide": "- stage: overpass\n  args: [{ lat: geo_lat, lon: geo_lon, tag: \"amenity=hospital\", radius: \"1000\", out: osm_count }]\n  # or positional [\"geo_lat\", \"geo_lon\", \"amenity=hospital\", 1000, \"osm_count\"]"
+  },
+  {
+    "stage_name": "satelliteIndices",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "latF",
+        "type": "string",
+        "required": false,
+        "default": "lat",
+        "description": "latitude column (WGS84)"
+      },
+      {
+        "name": "lonF",
+        "type": "string",
+        "required": false,
+        "default": "lon",
+        "description": "longitude column (WGS84)"
+      },
+      {
+        "name": "bufferMetres",
+        "type": "number",
+        "required": false,
+        "default": "250.0",
+        "description": "half side of the square around the point, metres (default 250, max 2000)"
+      },
+      {
+        "name": "fromDate",
+        "type": "string",
+        "required": false,
+        "default": "365d",
+        "description": "from: YYYY-MM-DD, \"<n>d\" = n days ago (default \"365d\")"
+      },
+      {
+        "name": "toDate",
+        "type": "string",
+        "required": false,
+        "default": "today",
+        "description": "to: YYYY-MM-DD or \"today\" (default)"
+      },
+      {
+        "name": "maxCloud",
+        "type": "number",
+        "required": false,
+        "default": "40.0",
+        "description": "max scene cloud cover % (default 40)"
+      },
+      {
+        "name": "maxPasses",
+        "type": "number",
+        "required": false,
+        "default": "30",
+        "description": "max passes per asset, most recent first (default 30)"
+      }
+    ],
+    "description": "Sentinel-2 spectral indices around each row's coordinates (vegetation, water, moisture, burn), one output row per cloud-free satellite pass — FREE, no API key.",
+    "usage_guide": "- stage: satelliteIndices\n  args:\n    - \"lat\"          # latitude column (WGS84)\n    - \"lon\"          # longitude column (WGS84)\n    - 250            # half side of the square around the point, metres (default 250, max 2000)\n    - \"365d\"         # from: YYYY-MM-DD, \"<n>d\" = n days ago (default \"365d\")\n    - \"today\"        # to: YYYY-MM-DD or \"today\" (default)\n    - 40             # max scene cloud cover % (default 40)\n    - 30             # max passes per asset, most recent first (default 30)"
   },
   {
     "stage_name": "secFundamentals",

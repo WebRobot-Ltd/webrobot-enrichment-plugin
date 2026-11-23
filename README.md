@@ -26,6 +26,23 @@ Adds: `sold_count`, `sold_median_price`, `sold_avg_price`, `sold_min_price`, `so
 `sold_latest_date`. Context-aware **partition stage** → each Spark executor fetches+caches every postcode
 it sees once (distributed load, no duplicate calls).
 
+### `satelliteIndices` — Sentinel-2 indices around an asset (climate & land risk)
+
+For each row with latitude/longitude, searches the **Copernicus Sentinel-2 L2A** archive (Cloud-Optimized
+GeoTIFFs on the AWS Registry of Open Data, catalogue [Earth Search](https://earth-search.aws.element84.com/v1))
+and reads **only the 20 m tiles around the point** via HTTP range requests — no image download, no GDAL.
+Clouds, shadows and snow are masked with the scene classification layer. One output row per usable pass.
+
+```yaml
+- stage: satelliteIndices
+  args: ["lat", "lon", 250, "365d", "today", 40, 30]   # cols, half-side m, from, to, max cloud %, max passes
+```
+
+Adds: `sat_date`, `sat_scene`, `sat_cloud_pct`, `sat_valid_pct`, `sat_pixels`, `ndvi_mean`, `ndvi_p10`,
+`ndvi_p90` (vegetation), `ndwi_mean` (open water), `ndmi_mean` (moisture / drought stress), `nbr_mean`
+(burn), `water_pct`, `sat_status` (`ok` or why there is no pass), `sat_source`. Licence: free and open —
+credit *"Contains modified Copernicus Sentinel data &lt;year&gt;"*.
+
 ### `gdelt` — daily world-news tone (sentiment signal)
 
 Produces one row per day of **GDELT** news tone (or article volume) for a query — a point-in-time news
