@@ -48,6 +48,42 @@
     "usage_guide": "- stage: binanceFunding\n  args:\n    - \"symbol\"      # perp symbol column, e.g. BTCUSDT (default \"symbol\")\n    - \"date\"        # date column YYYY-MM-DD for point-in-time (default \"date\"; missing → latest)"
   },
   {
+    "stage_name": "burntAreas",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "latF",
+        "type": "string",
+        "required": false,
+        "default": "lat",
+        "description": "latitude column (WGS84)"
+      },
+      {
+        "name": "lonF",
+        "type": "string",
+        "required": false,
+        "default": "lon",
+        "description": "longitude column (WGS84)"
+      },
+      {
+        "name": "radiusMetres",
+        "type": "number",
+        "required": false,
+        "default": "1000.0",
+        "description": "half side of the search square, metres (default 1000, max 10000)"
+      },
+      {
+        "name": "yearsBack",
+        "type": "number",
+        "required": false,
+        "default": "5",
+        "description": "years back, plus the current season (default 5, max 10)"
+      }
+    ],
+    "description": "Mapped wildfires (EFFIS burnt areas, JRC / Copernicus EMS) near each row's coordinates over the last years — FREE, no API key.",
+    "usage_guide": "- stage: burntAreas\n  args:\n    - \"lat\"   # latitude column (WGS84)\n    - \"lon\"   # longitude column (WGS84)\n    - 1000    # half side of the search square, metres (default 1000, max 10000)\n    - 5       # years back, plus the current season (default 5, max 10)"
+  },
+  {
     "stage_name": "censusGeocode",
     "aliases": [],
     "arg_schema": [],
@@ -150,6 +186,35 @@
     "arg_schema": [],
     "description": "Crypto Fear & Greed Index enrichment — FREE, no API key (alternative.me). A KEYLESS as-of join: the right side is one global daily series (no entity key), joined to each row by date. With an `asof` column it returns the index AS OF that day (backward, no look-ahead via [[AsOf.pick]]); otherwise the latest value.",
     "usage_guide": "- stage: fearGreed\n  args: [{ asof: date }]   # or positional [\"date\"]"
+  },
+  {
+    "stage_name": "floodLandslideHazard",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "latF",
+        "type": "string",
+        "required": false,
+        "default": "lat",
+        "description": "latitude column (WGS84)"
+      },
+      {
+        "name": "lonF",
+        "type": "string",
+        "required": false,
+        "default": "lon",
+        "description": "longitude column (WGS84)"
+      },
+      {
+        "name": "radiusMetres",
+        "type": "number",
+        "required": false,
+        "default": "100",
+        "description": "radius around the point, metres (30-500, default 100)"
+      }
+    ],
+    "description": "Italian flood and landslide hazard (PAI national mosaics, ISPRA IdroGEO) at each row's coordinates — FREE, no API key.",
+    "usage_guide": "- stage: floodLandslideHazard\n  args:\n    - \"lat\"   # latitude column (WGS84)\n    - \"lon\"   # longitude column (WGS84)\n    - 100     # radius around the point, metres (30-500, default 100)"
   },
   {
     "stage_name": "frankfurter",
