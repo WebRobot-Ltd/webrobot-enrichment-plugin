@@ -187,9 +187,9 @@ object SatelliteIndicesStage {
       "water_pct" -> r2(100.0 * water / valid), "sat_status" -> "ok")
   }
 
-  private def clean(a: Seq[Double]): Seq[Double] = a.filterNot(_.isNaN)
-  def mean(a: Seq[Double]): Double = { val c = clean(a); if (c.isEmpty) Double.NaN else c.sum / c.size }
-  def pct(a: Seq[Double], q: Double): Double = { val c = clean(a).sorted; if (c.isEmpty) Double.NaN else c(math.min(c.size - 1, (q * (c.size - 1)).round.toInt)) }
+  private def clean(a: scala.collection.Seq[Double]): Seq[Double] = a.filterNot(_.isNaN).toList
+  def mean(a: scala.collection.Seq[Double]): Double = { val c = clean(a); if (c.isEmpty) Double.NaN else c.sum / c.size }
+  def pct(a: scala.collection.Seq[Double], q: Double): Double = { val c = clean(a).sorted; if (c.isEmpty) Double.NaN else c(math.min(c.size - 1, (q * (c.size - 1)).round.toInt)) }
   private def r2(d: Double): Any = if (d.isNaN) "" else BigDecimal(d).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
   private def r3(d: Double): Any = if (d.isNaN) "" else BigDecimal(d).setScale(3, BigDecimal.RoundingMode.HALF_UP).toDouble
 
