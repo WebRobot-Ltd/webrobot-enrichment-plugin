@@ -80,3 +80,20 @@ then reference the stages by name in any pipeline YAML. See the WebRobot plugin 
 ## License
 
 MIT — use freely. Contributions welcome.
+
+## droneSurvey — simulated drone-fleet survey (ArduPilot SITL)
+
+For each site (latitude/longitude) a small fleet of simulated copters takes off from a pad just south of the area,
+surveys a disc of `radius_m` metres on a grid of photo points derived from altitude and camera field of view (split in
+parallel, balanced strips), and lands back. One output row per acquisition: drone, point, position, altitude, heading,
+ground speed, battery, simulated time, photo footprint (WKT) and ground sample distance.
+
+The flight is real autopilot behaviour: ArduCopter Copter-4.7.3 in software-in-the-loop (statically linked, GPLv3,
+built from the ArduPilot tag of the same name), spoken to over MAVLink 2 by a small hand-written codec in the stage —
+no extra dependency. The camera is not simulated: an acquisition is where and what a photo would cover. The simulator
+is downloaded once per JVM from the public tools bucket and verified against its sha256.
+
+```yaml
+- stage: droneSurvey
+  args: ["lat", "lon", 300, 3, 80, 12, 70, 55, 10, "asset_id"]
+```

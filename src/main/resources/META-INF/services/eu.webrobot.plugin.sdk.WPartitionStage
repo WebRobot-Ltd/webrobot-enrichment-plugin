@@ -25,3 +25,4 @@ eu.webrobot.plugins.enrichment.StockPriceStage
 eu.webrobot.plugins.enrichment.SatelliteIndicesStage
 eu.webrobot.plugins.enrichment.FloodLandslideHazardStage
 eu.webrobot.plugins.enrichment.BurntAreasStage
+eu.webrobot.plugins.enrichment.DroneSurveyStage

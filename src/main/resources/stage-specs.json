@@ -127,6 +127,83 @@
     "usage_guide": "- stage: defiLlama\n  args: [{ on: protocol, asof: date }]   # or positional [\"protocol\", \"date\"]"
   },
   {
+    "stage_name": "droneSurvey",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "latF",
+        "type": "string",
+        "required": false,
+        "default": "lat",
+        "description": "latitude column of the site (WGS84)"
+      },
+      {
+        "name": "lonF",
+        "type": "string",
+        "required": false,
+        "default": "lon",
+        "description": "longitude column of the site (WGS84)"
+      },
+      {
+        "name": "radiusMetres",
+        "type": "number",
+        "required": false,
+        "default": "300.0",
+        "description": "radius of the surveyed area, metres (default 300, 50-1000)"
+      },
+      {
+        "name": "dronesPerSite",
+        "type": "number",
+        "required": false,
+        "default": "3",
+        "description": "drones per site (default 3, 1-6)"
+      },
+      {
+        "name": "altitudeMetres",
+        "type": "number",
+        "required": false,
+        "default": "80.0",
+        "description": "flight altitude above take-off, metres (default 80, 20-120)"
+      },
+      {
+        "name": "speedMs",
+        "type": "number",
+        "required": false,
+        "default": "12.0",
+        "description": "cruise speed, m/s (default 12, 3-20)"
+      },
+      {
+        "name": "hfovDeg",
+        "type": "number",
+        "required": false,
+        "default": "70.0",
+        "description": "camera horizontal field of view, degrees (default 70)"
+      },
+      {
+        "name": "vfovDeg",
+        "type": "number",
+        "required": false,
+        "default": "55.0",
+        "description": "camera vertical field of view, degrees (default 55)"
+      },
+      {
+        "name": "simSpeedup",
+        "type": "number",
+        "required": false,
+        "default": "10",
+        "description": "simulation speed-up (default 10, 1-20)"
+      },
+      {
+        "name": "idF",
+        "type": "string",
+        "required": true,
+        "description": "optional id column, used as mission name"
+      }
+    ],
+    "description": "Drone-fleet survey around each row's coordinates, flown by SIMULATED copters (ArduPilot SITL) — one output row per acquisition point.",
+    "usage_guide": "- stage: droneSurvey\n  args:\n    - \"lat\"        # latitude column of the site (WGS84)\n    - \"lon\"        # longitude column of the site (WGS84)\n    - 300          # radius of the surveyed area, metres (default 300, 50-1000)\n    - 3            # drones per site (default 3, 1-6)\n    - 80           # flight altitude above take-off, metres (default 80, 20-120)\n    - 12           # cruise speed, m/s (default 12, 3-20)\n    - 70           # camera horizontal field of view, degrees (default 70)\n    - 55           # camera vertical field of view, degrees (default 55)\n    - 10           # simulation speed-up (default 10, 1-20)\n    - \"asset_id\"   # optional id column, used as mission name"
+  },
+  {
     "stage_name": "eurostat",
     "aliases": [],
     "arg_schema": [
