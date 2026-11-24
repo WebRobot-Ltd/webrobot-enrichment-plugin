@@ -198,9 +198,9 @@ object DroneSurveyStage {
 
   def le(n: Int): ByteBuffer = ByteBuffer.allocate(n).order(ByteOrder.LITTLE_ENDIAN)
 
-  final class Mav(port: Int) {
+  final class Mav(port: Int, host: String = "127.0.0.1") {
     private val sock = new Socket()
-    sock.connect(new InetSocketAddress("127.0.0.1", port), 5000)
+    sock.connect(new InetSocketAddress(host, port), 5000)
     sock.setSoTimeout(500)
     private val in: InputStream = sock.getInputStream
     private val out: OutputStream = sock.getOutputStream
@@ -251,16 +251,29 @@ object DroneSurveyStage {
         val total = hdr + ln + 2 + (if (v2 && (b(2) & 1) != 0) 13 else 0)
         if (b.length < total) { pending = b; return None }
         val msgid = if (v2) (b(7) & 0xFF) | ((b(8) & 0xFF) << 8) | ((b(9) & 0xFF) << 16) else b(5) & 0xFF
+        val sysid = if (v2) b(5) & 0xFF else b(3) & 0xFF   // only the autopilot (system 1): a router (MAVProxy) also sends heartbeats
         val crcIn = (b(hdr + ln) & 0xFF) | ((b(hdr + ln + 1) & 0xFF) << 8)
         val frame = b.slice(0, total); b = b.drop(total)
         CRC_EXTRA.get(msgid).foreach { extra =>
           val chk = java.util.Arrays.copyOfRange(frame, 1, hdr + ln + 1)
           chk(chk.length - 1) = extra.toByte
-          if (crcX25(chk, 0, chk.length) == crcIn && want.contains(msgid)) {
+          if (crcX25(chk, 0, chk.length) == crcIn && sysid == 1 && want.contains(msgid)) {
             val payload = java.util.Arrays.copyOf(frame.slice(hdr, hdr + ln), math.max(ln, LEN(msgid)))   // MAVLink 2 trims trailing zeros
             pending = b
             return Some((msgid, ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)))
           }
+        }
+      }
+      None
+    }
+
+    /** The acknowledgement of THIS command (a router may repeat older ones): Some(result) or None after `timeoutMs`. */
+    def awaitAck(cmd: Int, timeoutMs: Long): Option[Int] = {
+      val end = System.currentTimeMillis() + timeoutMs
+      while (System.currentTimeMillis() < end) {
+        recv(Set(77), math.max(1L, end - System.currentTimeMillis())) match {
+          case Some((_, b)) if (b.getShort(0) & 0xFFFF) == cmd => return Some(b.get(2) & 0xFF)
+          case _ =>
         }
       }
       None
@@ -343,7 +356,7 @@ object DroneSurveyStage {
       if (!guided) throw new RuntimeException("GUIDED refused")
       var armed = false; k = 0
       while (!armed && k < 40) {
-        m.command(400, Seq(1f)); m.recv(Set(77), 2000).foreach { case (_, b) => armed = (b.getShort(0) & 0xFFFF) == 400 && (b.get(2) & 0xFF) == 0 }
+        m.command(400, Seq(1f)); armed = m.awaitAck(400, 2000).contains(0)
         if (!armed) Thread.sleep(1000); k += 1
       }
       if (!armed) throw new RuntimeException("arming refused")

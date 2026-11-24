@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drone fleet — live</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  html,body{margin:0;height:100%;font-family:Inter,system-ui,sans-serif;background:#0b1220;color:#e6ecf7}
+  #map{position:absolute;inset:0 380px 0 0}
+  #side{position:absolute;top:0;right:0;width:380px;bottom:0;padding:18px;box-sizing:border-box;overflow:auto;background:#0b1220}
+  h1{font-size:18px;margin:0 0 4px} .muted{color:#93a3c4;font-size:12px}
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px} td,th{padding:6px 4px;border-bottom:1px solid #1e2a44;text-align:left}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+  .kpi{display:flex;gap:10px;margin-top:12px}.kpi div{flex:1;background:#121c31;border-radius:8px;padding:8px}.kpi b{display:block;font-size:20px}
+</style></head><body>
+<div id="map"></div>
+<div id="side">
+  <h1>Drone fleet — live</h1>
+  <div class="muted" id="src"></div>
+  <div class="kpi"><div><b id="k-air">0</b><span class="muted">in flight</span></div><div><b id="k-acq">0</b><span class="muted">acquired</span></div><div><b id="k-plan">0</b><span class="muted">planned</span></div></div>
+  <table><thead><tr><th>Drone</th><th>Mode</th><th>Alt</th><th>Speed</th><th>Batt</th></tr></thead><tbody id="rows"></tbody></table>
+  <p class="muted" id="mission"></p>
+</div>
+<script>
+const COLORS=['#4ea8ff','#ffb347','#7bd389','#ff6f91','#c39bff','#ffd93d','#5ee6e6','#ff8c42'];
+const map=L.map('map',{zoomControl:true});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+const drones={},trails={},targets=L.layerGroup().addTo(map),done=L.layerGroup().addTo(map);let fitted=false,planStamp=0,acqCount=0;
+function icon(c){return L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:50%;background:${c};border:2px solid #fff;box-shadow:0 0 8px ${c}"></div>`,iconSize:[16,16],iconAnchor:[8,8]})}
+async function tick(){
+  let r; try{ r=await (await fetch('/api/fleet',{cache:'no-store'})).json(); }catch(e){ return; }
+  document.getElementById('src').textContent=r.source+' · simulation ×'+r.speedup;
+  if(!fitted){ map.setView(r.base,14); fitted=true; L.circleMarker(r.base,{radius:7,color:'#fff',weight:2,fillOpacity:0}).addTo(map).bindTooltip('base'); }
+  let air=0; const rows=[];
+  for(const d of r.drones){ const c=COLORS[d.id%COLORS.length]; if(d.lat==null) continue;
+    if(!drones[d.id]) drones[d.id]=L.marker([d.lat,d.lon],{icon:icon(c),zIndexOffset:1000}).addTo(map).bindTooltip('drone '+d.id);
+    drones[d.id].setLatLng([d.lat,d.lon]);
+    if(!trails[d.id]) trails[d.id]=L.polyline([], {color:c,weight:3,opacity:.85}).addTo(map);
+    trails[d.id].setLatLngs(d.trail||[]);
+    if(d.armed) air++;
+    rows.push(`<tr><td><span class="dot" style="background:${c}"></span>${d.id}</td><td>${d.mode||''}</td><td>${d.alt} m</td><td>${d.speed} m/s</td><td>${d.battery==null?'':d.battery+'%'}</td></tr>`);
+  }
+  document.getElementById('rows').innerHTML=rows.join('');
+  document.getElementById('k-air').textContent=air;
+  const p=r.plan||{points:[],acquired:[]};
+  if(p.updated!==planStamp){ planStamp=p.updated; targets.clearLayers(); done.clearLayers(); acqCount=0;
+    for(const t of p.points){ const c=COLORS[(t.drone||0)%COLORS.length]; L.circleMarker([t.lat,t.lon],{radius:5,color:c,weight:2,fillOpacity:0}).addTo(targets).bindTooltip(`${t.id||''} · drone ${t.drone} #${t.seq}`); }
+    if(p.points.length) map.fitBounds(L.latLngBounds(p.points.map(t=>[t.lat,t.lon]).concat([r.base])).pad(0.15));
+  }
+  for(const a of p.acquired.slice(acqCount)){ const c=COLORS[(a.drone||0)%COLORS.length]; L.circleMarker([a.lat,a.lon],{radius:5,color:c,weight:1,fillColor:c,fillOpacity:.9}).addTo(done); }
+  acqCount=p.acquired.length;
+  document.getElementById('k-acq').textContent=p.acquired.length; document.getElementById('k-plan').textContent=p.points.length;
+  document.getElementById('mission').textContent=p.mission?('Mission: '+p.mission):'Waiting for a mission from a WebRobot pipeline.';
+}
+tick(); setInterval(tick,700);
+</script></body></html>

@@ -265,6 +265,91 @@
     "usage_guide": "- stage: fearGreed\n  args: [{ asof: date }]   # or positional [\"date\"]"
   },
   {
+    "stage_name": "fleetFly",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "speedMs",
+        "type": "number",
+        "required": false,
+        "default": "12.0",
+        "description": "cruise speed, m/s (default 12)"
+      },
+      {
+        "name": "hfovDeg",
+        "type": "number",
+        "required": false,
+        "default": "70.0",
+        "description": "camera horizontal field of view, degrees (default 70)"
+      },
+      {
+        "name": "vfovDeg",
+        "type": "number",
+        "required": false,
+        "default": "55.0",
+        "description": "camera vertical field of view, degrees (default 55)"
+      }
+    ],
+    "description": "Flies the routes planned by fleetPlan with the fleet's drones — one output row per acquisition point.",
+    "usage_guide": "- stage: fleetFly\n  args:\n    - 12      # cruise speed, m/s (default 12)\n    - 70      # camera horizontal field of view, degrees (default 70)\n    - 55      # camera vertical field of view, degrees (default 55)"
+  },
+  {
+    "stage_name": "fleetPlan",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "fleetUrl",
+        "type": "string",
+        "required": false,
+        "default": "http://uav-fleet.webrobot.svc.cluster.local:8080",
+        "description": "fleet service"
+      },
+      {
+        "name": "latF",
+        "type": "string",
+        "required": false,
+        "default": "lat",
+        "description": "latitude column of the point to inspect"
+      },
+      {
+        "name": "lonF",
+        "type": "string",
+        "required": false,
+        "default": "lon",
+        "description": "longitude column"
+      },
+      {
+        "name": "idF",
+        "type": "string",
+        "required": true,
+        "description": "id column of the point (optional)"
+      },
+      {
+        "name": "baseAltM",
+        "type": "number",
+        "required": false,
+        "default": "50.0",
+        "description": "altitude of the lowest layer, metres (default 50)"
+      },
+      {
+        "name": "layerM",
+        "type": "number",
+        "required": false,
+        "default": "10.0",
+        "description": "vertical separation between drones, metres (default 10)"
+      },
+      {
+        "name": "missionName",
+        "type": "string",
+        "required": false,
+        "default": "inspection",
+        "description": "mission name (default \"inspection\")"
+      }
+    ],
+    "description": "Plans an inspection mission for a persistent drone FLEET (the uav-fleet service: simulated ArduPilot copters, one MAVProxy each) — one output row per drone, carrying its route.",
+    "usage_guide": "- stage: fleetPlan\n  args:\n    - \"http://uav-fleet.webrobot.svc.cluster.local:8080\"   # fleet service\n    - \"lat\"          # latitude column of the point to inspect\n    - \"lon\"          # longitude column\n    - \"point_id\"     # id column of the point (optional)\n    - 50             # altitude of the lowest layer, metres (default 50)\n    - 10             # vertical separation between drones, metres (default 10)\n    - \"inspection\"   # mission name (default \"inspection\")"
+  },
+  {
     "stage_name": "floodLandslideHazard",
     "aliases": [],
     "arg_schema": [

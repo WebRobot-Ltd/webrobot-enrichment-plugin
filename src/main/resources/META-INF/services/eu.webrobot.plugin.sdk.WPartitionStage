@@ -26,3 +26,5 @@ eu.webrobot.plugins.enrichment.SatelliteIndicesStage
 eu.webrobot.plugins.enrichment.FloodLandslideHazardStage
 eu.webrobot.plugins.enrichment.BurntAreasStage
 eu.webrobot.plugins.enrichment.DroneSurveyStage
+eu.webrobot.plugins.enrichment.FleetPlanStage
+eu.webrobot.plugins.enrichment.FleetFlyStage

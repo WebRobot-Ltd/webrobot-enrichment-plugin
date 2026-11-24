@@ -1,0 +1,42 @@
+# uav-fleet: persistent fleet of SIMULATED copters (ArduPilot SITL Copter-4.7.3 + one MAVProxy each) with a live map.
+# kubectl -n webrobot create configmap uav-fleet-code --from-file=fleet/fleet.py --from-file=fleet/map.html --dry-run=client -o yaml | kubectl apply -f -
+# kubectl apply -f fleet/k8s.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: uav-fleet, namespace: webrobot, labels: {app: uav-fleet}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: uav-fleet}}
+  template:
+    metadata: {labels: {app: uav-fleet}}
+    spec:
+      containers:
+      - name: fleet
+        image: python:3.11-slim
+        command: ["/bin/sh", "-c"]
+        args: ["pip install -q pymavlink pyserial aiohttp && pip install -q --no-deps MAVProxy && cd /app && exec python -u fleet.py"]
+        env:
+        - {name: FLEET_N, value: "5"}
+        - {name: FLEET_LAT, value: "44.2850"}
+        - {name: FLEET_LON, value: "11.8830"}
+        - {name: FLEET_SPEEDUP, value: "10"}
+        ports:
+        - {name: http, containerPort: 8080}
+        readinessProbe: {httpGet: {path: /healthz, port: 8080}, initialDelaySeconds: 30, periodSeconds: 10}
+        resources: {requests: {cpu: "1", memory: 1Gi}, limits: {cpu: "3", memory: 2Gi}}
+        volumeMounts: [{name: code, mountPath: /app}]
+      volumes: [{name: code, configMap: {name: uav-fleet-code}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: uav-fleet, namespace: webrobot}
+spec:
+  selector: {app: uav-fleet}
+  ports:
+  - {name: http, port: 8080, targetPort: 8080}
+  - {name: drone0, port: 6000, targetPort: 6000}
+  - {name: drone1, port: 6001, targetPort: 6001}
+  - {name: drone2, port: 6002, targetPort: 6002}
+  - {name: drone3, port: 6003, targetPort: 6003}
+  - {name: drone4, port: 6004, targetPort: 6004}
