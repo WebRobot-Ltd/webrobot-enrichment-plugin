@@ -81,34 +81,36 @@ def load_net(path):
 REGION_LOCK = threading.Lock()
 
 
-def region_roads():
-    """The regional OpenStreetMap extract (Geofabrik, ODbL), downloaded ONCE and reduced to roads only, so every area
-    is then cut locally in seconds: no per-request load on shared public services."""
+def region_extract():
+    """The regional OpenStreetMap extract (Geofabrik, ODbL), downloaded ONCE; every area is then cut from it locally
+    in seconds: no per-request load on shared public services."""
     url = os.environ.get("OSM_PBF_URL", "")
     if not url or not shutil.which("osmium"):
         return None
     d = DATA / "osm"
-    roads = d / "region-roads.osm.pbf"
+    region = d / "region.osm.pbf"
     with REGION_LOCK:
-        if not roads.exists():
+        if not region.exists():
             d.mkdir(parents=True, exist_ok=True)
-            part = d / "region.osm.pbf.part"
+            part = d / "download.part"
             req = urllib.request.Request(url, headers={"User-Agent": "webrobot-sumo-sim/0.1"})
             with urllib.request.urlopen(req, timeout=600) as resp, open(part, "wb") as f:
                 shutil.copyfileobj(resp, f, 1 << 20)
-            run(["osmium", "tags-filter", part, f"w/highway={ROADS.replace('|', ',')}",
-                 *[f"w/highway={r}_link" for r in ("motorway", "trunk", "primary", "secondary", "tertiary")],
-                 "-o", roads, "--overwrite"], timeout=3600)
-            part.unlink(missing_ok=True)
-    return roads
+            part.rename(region)   # only a complete download gets the final name
+    return region
 
 
 def fetch_osm(query, dest, bbox):
     s, w, n, e = bbox
-    roads = region_roads()
-    if roads is not None:
-        run(["osmium", "extract", "-b", f"{w},{s},{e},{n}", "--strategy", "complete_ways", roads,
-             "-o", dest, "-f", "osm", "--overwrite"], timeout=600)
+    region = region_extract()
+    if region is not None:
+        # cut first (strategy "simple" keeps only the bbox's nodes in memory: a region-wide tags-filter needs >2 GiB),
+        # then keep the roads of the small cut
+        cut = dest.with_suffix(".cut.osm.pbf")
+        run(["osmium", "extract", "-b", f"{w},{s},{e},{n}", "--strategy", "simple", region, "-o", cut, "--overwrite"],
+            timeout=600)
+        run(["osmium", "tags-filter", cut, "w/highway", "-o", dest, "-f", "osm", "--overwrite"], timeout=600)
+        cut.unlink(missing_ok=True)
         if dest.stat().st_size > 1000:
             return
         raise ValueError("area outside the regional OpenStreetMap extract (OSM_PBF_URL)")
