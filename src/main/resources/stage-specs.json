@@ -796,6 +796,117 @@
     "usage_guide": "- stage: stockPrice\n  args: [{ on: ticker, asof: date, start: \"2015-01-01\", adjustment: split }]\n  # positional [\"ticker\",\"date\"] also works; asof omitted ⇒ latest bar"
   },
   {
+    "stage_name": "trafficNetwork",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "serviceUrl",
+        "type": "string",
+        "required": false,
+        "default": "http://sumo-sim.webrobot.svc.cluster.local:8080",
+        "description": "simulator service"
+      },
+      {
+        "name": "areaF",
+        "type": "string",
+        "required": false,
+        "default": "area",
+        "description": "area name column"
+      },
+      {
+        "name": "southF",
+        "type": "string",
+        "required": false,
+        "default": "south",
+        "description": "bbox columns (WGS84 degrees)"
+      },
+      {
+        "name": "westF",
+        "type": "string",
+        "required": false,
+        "default": "west"
+      },
+      {
+        "name": "northF",
+        "type": "string",
+        "required": false,
+        "default": "north"
+      },
+      {
+        "name": "eastF",
+        "type": "string",
+        "required": false,
+        "default": "east"
+      }
+    ],
+    "description": "Acquires the road network of an area from the traffic simulator service (sumo-sim: Eclipse SUMO, headless) — one output row per road edge.",
+    "usage_guide": "- stage: trafficNetwork\n  args:\n    - \"http://sumo-sim.webrobot.svc.cluster.local:8080\"   # simulator service\n    - \"area\"    # area name column\n    - \"south\"   # bbox columns (WGS84 degrees)\n    - \"west\"\n    - \"north\"\n    - \"east\""
+  },
+  {
+    "stage_name": "trafficScenarios",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "hazardF",
+        "type": "string",
+        "required": false,
+        "default": "hz_flood_max",
+        "description": "hazard column (numeric class; \"\" = no hazard scenarios)"
+      },
+      {
+        "name": "levelsS",
+        "type": "string",
+        "required": false,
+        "default": "3,2,1",
+        "description": "hazard levels, one scenario each"
+      },
+      {
+        "name": "vph",
+        "type": "number",
+        "required": false,
+        "default": "2000",
+        "description": "vehicles per hour (random origin-destination demand)"
+      },
+      {
+        "name": "duration",
+        "type": "number",
+        "required": false,
+        "default": "1800",
+        "description": "demand duration, seconds"
+      },
+      {
+        "name": "seed",
+        "type": "number",
+        "required": false,
+        "default": "42",
+        "description": "demand seed (same seed = same trips in every scenario)"
+      },
+      {
+        "name": "manualS",
+        "type": "string",
+        "required": true,
+        "description": "manual closures \"name:street|street;name2:street\""
+      }
+    ],
+    "description": "Turns the road edges of a network (from trafficNetwork, enriched with a hazard class) into impact SCENARIOS — one output row per scenario, carrying the edges it closes.",
+    "usage_guide": "- stage: trafficScenarios\n  args:\n    - \"hz_flood_max\"   # hazard column (numeric class; \"\" = no hazard scenarios)\n    - \"3,2,1\"          # hazard levels, one scenario each\n    - 2000             # vehicles per hour (random origin-destination demand)\n    - 1800             # demand duration, seconds\n    - 42               # demand seed (same seed = same trips in every scenario)\n    - \"\"               # manual closures \"name:street|street;name2:street\""
+  },
+  {
+    "stage_name": "trafficSimulate",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "maxWaitS",
+        "type": "number",
+        "required": false,
+        "default": "3600",
+        "description": "max wait per scenario, seconds (queue + simulation, default 3600)"
+      }
+    ],
+    "description": "Runs each scenario (from trafficScenarios) on the traffic simulator service (sumo-sim: Eclipse SUMO, headless) and acquires its impact KPIs — one output row per scenario.",
+    "usage_guide": "- stage: trafficSimulate\n  args:\n    - 3600   # max wait per scenario, seconds (queue + simulation, default 3600)"
+  },
+  {
     "stage_name": "worldBank",
     "aliases": [],
     "arg_schema": [

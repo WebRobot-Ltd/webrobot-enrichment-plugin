@@ -28,3 +28,6 @@ eu.webrobot.plugins.enrichment.BurntAreasStage
 eu.webrobot.plugins.enrichment.DroneSurveyStage
 eu.webrobot.plugins.enrichment.FleetPlanStage
 eu.webrobot.plugins.enrichment.FleetFlyStage
+eu.webrobot.plugins.enrichment.TrafficNetworkStage
+eu.webrobot.plugins.enrichment.TrafficScenariosStage
+eu.webrobot.plugins.enrichment.TrafficSimulateStage

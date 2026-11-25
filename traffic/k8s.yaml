@@ -1,0 +1,42 @@
+# sumo-sim: light urban traffic SIMULATOR (Eclipse SUMO, headless, one simulation at a time) for impact studies.
+# Spark acquires from it with the stages trafficNetwork / trafficScenarios / trafficSimulate.
+# kubectl -n webrobot create configmap sumo-sim-code --from-file=traffic/sumo_sim.py --dry-run=client -o yaml | kubectl apply -f -
+# kubectl apply -f traffic/k8s.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sumo-sim, namespace: webrobot, labels: {app: sumo-sim}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: sumo-sim}}
+  template:
+    metadata: {labels: {app: sumo-sim}}
+    spec:
+      containers:
+      - name: sim
+        image: python:3.11-slim
+        command: ["/bin/sh", "-c"]
+        args: ["apt-get -qq update && apt-get -qq install -y --no-install-recommends osmium-tool >/dev/null && pip install -q --no-cache-dir eclipse-sumo==1.28.0 sumolib==1.28.0 pyproj==3.7.2 && cd /app && exec python -u sumo_sim.py"]
+        env:
+        # regional OSM extract (Geofabrik, ODbL): downloaded once, reduced to roads; areas are cut from it locally
+        - {name: OSM_PBF_URL, value: "https://download.geofabrik.de/europe/italy/nord-est-latest.osm.pbf"}
+        - {name: SUMO_DATA, value: /data}
+        - {name: SUMO_MAX_PARALLEL, value: "1"}
+        - {name: SUMO_MAX_KM2, value: "16"}
+        - {name: PORT, value: "8080"}
+        ports:
+        - {name: http, containerPort: 8080}
+        readinessProbe: {httpGet: {path: /healthz, port: 8080}, initialDelaySeconds: 20, periodSeconds: 10}
+        resources: {requests: {cpu: 500m, memory: 512Mi}, limits: {cpu: 1500m, memory: 2Gi}}
+        volumeMounts: [{name: code, mountPath: /app}, {name: data, mountPath: /data}]
+      volumes:
+      - {name: code, configMap: {name: sumo-sim-code}}
+      - {name: data, emptyDir: {sizeLimit: 4Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: sumo-sim, namespace: webrobot}
+spec:
+  selector: {app: sumo-sim}
+  ports:
+  - {name: http, port: 8080, targetPort: 8080}
