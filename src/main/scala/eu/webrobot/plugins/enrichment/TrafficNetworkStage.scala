@@ -13,8 +13,9 @@ import scala.util.Try
  *
  * Each input row is an area (name + bounding box, max 16 km²). The service builds the SUMO network from OpenStreetMap
  * (roads open to cars, guessed traffic lights) and returns every edge with its street name, type, length, speed limit,
- * lanes and middle point. `cell_lat`/`cell_lon` round the middle point to a ~100 m grid, so that a point lookup such
- * as floodLandslideHazard is called once per cell instead of once per edge.
+ * lanes and middle point. `cell_lat`/`cell_lon` snap the middle point to a square grid (`grid_m`, default 100 m), so that
+ * a point lookup such as floodLandslideHazard is called once per cell instead of once per edge: a coarser grid means
+ * fewer calls (≈ area / grid²) and a coarser hazard map — give the lookup a radius of about half the grid.
  *
  * Pipeline YAML:
  * {{{
@@ -26,6 +27,7 @@ import scala.util.Try
  *     - "west"
  *     - "north"
  *     - "east"
+ *     - 100       # grid for cell_lat/cell_lon, metres (20-1000, default 100)
  * }}}
  * Output: tr_service, tr_network, tr_edge_id, tr_street, tr_road_type, lat, lon, cell_lat, cell_lon, tr_length_m,
  * tr_speed_kmh, tr_lanes, tr_status, tr_source.
@@ -41,11 +43,13 @@ class TrafficNetworkStage extends WPartitionStage {
     val westF  = args.string(3, "west")
     val northF = args.string(4, "north")
     val eastF  = args.string(5, "east")
+    val gridM  = args.double(6, 100.0)
+    val grid = math.max(20.0, math.min(1000.0, gridM))
     rows.flatMap { row =>
       val area = String.valueOf(row.fields.getOrElse(areaF, "area"))
       val bbox = Seq(southF, westF, northF, eastF).map(f => row.double(f).getOrElse(Double.NaN))
       if (bbox.exists(_.isNaN)) Iterator(WRow(Map("tr_network" -> area, "tr_status" -> "no_bbox")))
-      else Try(TrafficSim.network(serviceUrl, area, bbox)).recover { case e: Throwable =>
+      else Try(TrafficSim.network(serviceUrl, area, bbox, grid)).recover { case e: Throwable =>
         ctx.warn(s"trafficNetwork $area: ${e.getMessage}")
         Seq(WRow(Map[String, Any]("tr_network" -> area, "tr_status" -> ("error:" + String.valueOf(e.getMessage).take(150)))))
       }.get.iterator
@@ -74,18 +78,22 @@ object TrafficSim {
 
   def str(o: Map[String, Any], k: String): String = o.get(k).map(String.valueOf).filter(_ != "null").getOrElse("")
 
-  def network(url: String, area: String, bbox: Seq[Double]): Seq[WRow] = {
+  def network(url: String, area: String, bbox: Seq[Double], gridM: Double): Seq[WRow] = {
     val Seq(s, w, n, e) = bbox
     val o = post(s"$url/api/network", s"""{"name":"${esc(area)}","south":$s,"west":$w,"north":$n,"east":$e}""", 900)
     val net = str(o, "network")
     val source = str(o, "source")
+    // grid in degrees: same size in metres on both axes at the area's latitude
+    val stepLat = gridM / 111320.0
+    val stepLon = gridM / (111320.0 * math.cos(math.toRadians((s + n) / 2)))
+    def snap(v: Double, step: Double): Double = math.round(math.round(v / step) * step * 1e6) / 1e6
     Json.arr(o.get("edge_list")).map { x0 =>
       val x = Json.obj(x0)
       val lat = Json.num(x.get("lat")); val lon = Json.num(x.get("lon"))
       WRow(Map[String, Any](
         "tr_service" -> url, "tr_network" -> net, "tr_edge_id" -> str(x, "edge_id"), "tr_street" -> str(x, "street"),
         "tr_road_type" -> str(x, "road_type"), "lat" -> lat, "lon" -> lon,
-        "cell_lat" -> math.round(lat * 1000) / 1000.0, "cell_lon" -> math.round(lon * 1000) / 1000.0,
+        "cell_lat" -> snap(lat, stepLat), "cell_lon" -> snap(lon, stepLon),
         "tr_length_m" -> Json.num(x.get("length_m")), "tr_speed_kmh" -> Json.num(x.get("speed_kmh")).toInt,
         "tr_lanes" -> Json.num(x.get("lanes")).toInt, "tr_status" -> "ok", "tr_source" -> source))
     }.toList

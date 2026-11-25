@@ -824,7 +824,8 @@
         "name": "westF",
         "type": "string",
         "required": false,
-        "default": "west"
+        "default": "west",
+        "description": "grid for cell_lat/cell_lon, metres (20-1000, default 100)"
       },
       {
         "name": "northF",
@@ -837,10 +838,16 @@
         "type": "string",
         "required": false,
         "default": "east"
+      },
+      {
+        "name": "gridM",
+        "type": "number",
+        "required": false,
+        "default": "100.0"
       }
     ],
     "description": "Acquires the road network of an area from the traffic simulator service (sumo-sim: Eclipse SUMO, headless) — one output row per road edge.",
-    "usage_guide": "- stage: trafficNetwork\n  args:\n    - \"http://sumo-sim.webrobot.svc.cluster.local:8080\"   # simulator service\n    - \"area\"    # area name column\n    - \"south\"   # bbox columns (WGS84 degrees)\n    - \"west\"\n    - \"north\"\n    - \"east\""
+    "usage_guide": "- stage: trafficNetwork\n  args:\n    - \"http://sumo-sim.webrobot.svc.cluster.local:8080\"   # simulator service\n    - \"area\"    # area name column\n    - \"south\"   # bbox columns (WGS84 degrees)\n    - \"west\"\n    - \"north\"\n    - \"east\"\n    - 100       # grid for cell_lat/cell_lon, metres (20-1000, default 100)"
   },
   {
     "stage_name": "trafficScenarios",
