@@ -16,7 +16,7 @@ spec:
       - name: sim
         image: python:3.11-slim
         command: ["/bin/sh", "-c"]
-        args: ["apt-get -qq update && apt-get -qq install -y --no-install-recommends osmium-tool libatomic1 >/dev/null && pip install -q --no-cache-dir eclipse-sumo==1.28.0 sumolib==1.28.0 pyproj==3.7.2 && cd /app && exec python -u sumo_sim.py"]
+        args: ["apt-get -qq update && apt-get -qq install -y --no-install-recommends osmium-tool libatomic1 libgl1 libx11-6 libxext6 libxrender1 >/dev/null && pip install -q --no-cache-dir eclipse-sumo==1.28.0 sumolib==1.28.0 pyproj==3.7.2 && cd /app && exec python -u sumo_sim.py"]
         env:
         # regional OSM extract (Geofabrik, ODbL): downloaded once, reduced to roads; areas are cut from it locally
         - {name: OSM_PBF_URL, value: "https://download.geofabrik.de/europe/italy/nord-est-latest.osm.pbf"}
