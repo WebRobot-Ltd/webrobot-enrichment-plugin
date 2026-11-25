@@ -1,6 +1,6 @@
 # sumo-sim: light urban traffic SIMULATOR (Eclipse SUMO, headless, one simulation at a time) for impact studies.
 # Spark acquires from it with the stages trafficNetwork / trafficScenarios / trafficSimulate.
-# kubectl -n webrobot create configmap sumo-sim-code --from-file=traffic/sumo_sim.py --dry-run=client -o yaml | kubectl apply -f -
+# kubectl -n webrobot create configmap sumo-sim-code --from-file=traffic/sumo_sim.py --from-file=traffic/map.html --dry-run=client -o yaml | kubectl apply -f -
 # kubectl apply -f traffic/k8s.yaml
 apiVersion: apps/v1
 kind: Deployment

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traffic impact map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg:#07122b; --panel:#0d1c3d; --ink:#e7ecf7; --mute:#93a3c4; --closed:#ff4d4f; --hot:#f2a93b; --road:#7f8ba3; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:Inter,system-ui,sans-serif; }
+  header { height:56px; display:flex; align-items:center; gap:18px; padding:0 20px; font-size:20px; font-weight:700; }
+  header span { font-weight:500; color:var(--mute); font-size:15px; }
+  #grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:10px; padding:0 10px; height:calc(100% - 56px - 44px); }
+  .cell { position:relative; background:var(--panel); border-radius:10px; overflow:hidden; }
+  .map { position:absolute; inset:0; }
+  .map .leaflet-tile-pane { filter:grayscale(1) brightness(.55) contrast(1.1); }
+  .title { position:absolute; z-index:500; left:10px; top:10px; right:10px; display:flex; flex-direction:column; gap:3px;
+           background:rgba(5,10,25,.82); border-radius:8px; padding:8px 12px; pointer-events:none; }
+  .title b { font-size:17px; }
+  .title i { font-style:normal; font-size:13.5px; color:var(--mute); }
+  .title .k { color:var(--ink); font-weight:600; }
+  footer { height:44px; display:flex; align-items:center; gap:22px; padding:0 20px; font-size:13px; color:var(--mute); }
+  .sw { display:inline-block; width:22px; height:5px; border-radius:3px; vertical-align:middle; margin-right:6px; }
+  .src { margin-left:auto; }
+</style>
+</head>
+<body>
+<header>Traffic impact of flood-hazard road closures <span id="sub">loading…</span></header>
+<div id="grid"></div>
+<footer>
+  <span><i class="sw" style="background:var(--closed)"></i>closed road</span>
+  <span><i class="sw" style="background:var(--hot)"></i>most congested streets (top 5)</span>
+  <span><i class="sw" style="background:var(--road)"></i>open road</span>
+  <span class="src">Simulated traffic (Eclipse SUMO, random origin–destination demand) · roads © OpenStreetMap contributors · flood hazard ISPRA IdroGEO</span>
+</footer>
+<script>
+const NAMES = { baseline: 'Baseline — no closures', hazard_ge_3: 'Flood hazard P3 (high) closed',
+  hazard_ge_2: 'Flood hazard P2 (medium) closed', hazard_ge_1: 'Flood hazard P1 (low) closed',
+  ponte_grazie: 'What-if: Ponte delle Grazie closed' };
+const nice = l => NAMES[l] || ('What-if: ' + l.replace(/[_-]+/g, ' '));
+const q = new URLSearchParams(location.search);
+const anim = q.get('anim') !== '0';
+
+async function j(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
+
+async function main() {
+  let ids = (q.get('runs') || '').split(',').filter(Boolean);
+  if (!ids.length) ids = (await j('/api/runs')).slice(0, 4).reverse().map(r => r.run_id);
+  const runs = await Promise.all(ids.map(id => j('/api/result?run=' + encodeURIComponent(id))));
+  const geo = await j('/api/geo?network=' + encodeURIComponent(runs[0].network));
+  const base = runs.find(r => r.label === 'baseline');
+  document.getElementById('sub').textContent = `${geo.network} · ${runs[0].trips_planned} simulated trips · same demand in every scenario`;
+  const [s, w, n, e] = geo.bbox, bounds = L.latLngBounds([s, w], [n, e]);
+  const maps = [], layers = [];
+  const grid = document.getElementById('grid');
+  runs.forEach((r, i) => {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    const d = base && r !== base ? Math.round((r.avg_trip_duration_s - base.avg_trip_duration_s) / base.avg_trip_duration_s * 100) : null;
+    cell.innerHTML = `<div class="map" id="m${i}"></div><div class="title"><b>${nice(r.label)}</b>
+      <i><span class="k">${r.closed_road_km} km</span> closed · <span class="k">${r.trips_impossible}</span> trips impossible ·
+      avg trip <span class="k">${Math.round(r.avg_trip_duration_s)} s</span>${d === null ? '' : ` (${d >= 0 ? '+' : ''}${d}%)`} ·
+      stuck <span class="k">${r.teleports}</span></i></div>`;
+    grid.appendChild(cell);
+    const m = L.map('m' + i, { zoomControl: false, attributionControl: false, zoomSnap: 0.25 });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(m);
+    m.fitBounds(bounds, { paddingTopLeft: [4, 66], paddingBottomRight: [4, 4] });
+    maps.push(m);
+    const closed = new Set(r.closed_edge_ids || []);
+    const hot = (r.hotspots || []).slice(0, 5).map(h => h.street);
+    const open = L.layerGroup(), shut = L.layerGroup(), cong = L.layerGroup();
+    for (const ed of geo.edges) {
+      if (closed.has(ed.id)) L.polyline(ed.c, { color: '#ff4d4f', weight: 4.5, opacity: .95 }).addTo(shut);
+      else if (hot.includes(ed.street)) L.polyline(ed.c, { color: '#f2a93b', weight: 4.5, opacity: .95 }).addTo(cong);
+      else L.polyline(ed.c, { color: '#7f8ba3', weight: 1.6, opacity: .75 }).addTo(open);
+    }
+    open.addTo(m);
+    layers.push([shut, cong, m]);
+  });
+  // keep the four views together
+  let syncing = false;
+  maps.forEach(a => a.on('move', () => { if (syncing) return; syncing = true;
+    maps.forEach(b => { if (b !== a) b.setView(a.getCenter(), a.getZoom(), { animate: false }); }); syncing = false; }));
+  // reveal: closures first, then the congestion they cause
+  const show = (k, delay) => layers.forEach(([shut, cong, m], i) => setTimeout(() => (k ? cong : shut).addTo(m), delay + i * 350));
+  if (anim) { show(0, 1500); show(1, 4000); } else { show(0, 0); show(1, 0); }
+}
+main().catch(err => { document.getElementById('sub').textContent = 'error: ' + err.message; });
+</script>
+</body>
+</html>

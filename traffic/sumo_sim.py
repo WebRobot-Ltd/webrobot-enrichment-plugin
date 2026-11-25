@@ -272,6 +272,37 @@ def run_scenario(req):
     return res
 
 
+_geo = {}
+
+
+def network_geo(network):
+    """Every edge of a network as a lat/lon polyline, for the map."""
+    netdir = DATA / "networks" / safe(network)
+    f = netdir / "net.net.xml"
+    if not f.exists():
+        raise ValueError(f"network '{network}' not built")
+    key = (str(f), f.stat().st_mtime)
+    if key not in _geo:
+        net = load_net(f)
+        edges = []
+        for x in net.getEdges():
+            pts = [net.convertXY2LonLat(px, py) for px, py in x.getShape()]
+            edges.append({"id": x.getID(), "street": street(x), "c": [[round(la, 6), round(lo, 6)] for lo, la in pts]})
+        _geo.clear()
+        _geo[key] = {"network": netdir.name, "bbox": json.loads((netdir / "meta.json").read_text())["bbox"], "edges": edges}
+    return _geo[key]
+
+
+def run_detail(run_id):
+    rd = DATA / "runs" / re.sub(r"[^0-9a-zA-Z-]", "", run_id)
+    if not (rd / "result.json").exists():
+        raise ValueError("run not found")
+    r = json.loads((rd / "result.json").read_text())
+    cf = rd / "closed.txt"
+    r["closed_edge_ids"] = cf.read_text().split() if cf.exists() else []
+    return r
+
+
 def list_runs():
     out = []
     for p in sorted((DATA / "runs").glob("*/result.json"), reverse=True)[:100]:
@@ -289,6 +320,20 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/healthz":
             return self._send(200, {"ok": True})
+        u = urllib.parse.urlparse(self.path)
+        q = dict(urllib.parse.parse_qsl(u.query))
+        try:
+            if u.path == "/" or u.path == "/map":
+                page = (Path(__file__).parent / "map.html").read_bytes()
+                self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(page))); self.end_headers(); self.wfile.write(page)
+                return
+            if u.path == "/api/geo":
+                return self._send(200, network_geo(q.get("network", "")))
+            if u.path == "/api/result":
+                return self._send(200, run_detail(q.get("run", "")))
+        except ValueError as e:
+            return self._send(404, {"error": str(e)})
         if self.path.startswith("/api/runs"):
             return self._send(200, list_runs())
         if self.path.startswith("/api/networks"):
