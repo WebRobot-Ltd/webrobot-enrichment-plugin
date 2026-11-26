@@ -31,3 +31,4 @@ eu.webrobot.plugins.enrichment.FleetFlyStage
 eu.webrobot.plugins.enrichment.TrafficNetworkStage
 eu.webrobot.plugins.enrichment.TrafficScenariosStage
 eu.webrobot.plugins.enrichment.TrafficSimulateStage
+eu.webrobot.plugins.enrichment.HubspotSyncStage

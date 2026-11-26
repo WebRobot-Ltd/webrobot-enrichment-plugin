@@ -519,6 +519,97 @@
     "usage_guide": "# 1) JSON API, GET\n- stage: httpSource\n  args:\n    - url: \"https://api.the-odds-api.com/v4/sports/soccer_epl/odds?regions=eu&markets=h2h&apiKey=${THEODDS_API_KEY}\"\n      headers: { Accept: application/json }          # optional; ${ENV} expanded in url, body and header values\n      record: '\\{\"id\":\"[^\"]+\".*?\"bookmakers\":\\[.*?\\]\\}'   # optional regex splitting body into N records\n      fields:                                        # name -> regex (capture group 1) applied per record\n        event_id:  '\"id\":\"([^\"]+)\"'\n        home_team: '\"home_team\":\"([^\"]+)\"'\n      timeout: 30000\n# 2) JSON API, POST with paging ({page} is replaced by 1..pages; stops at the first page with no records)\n- stage: httpSource\n  args:\n    - url: \"https://api.ted.europa.eu/v3/notices/search\"\n      method: POST\n      body: '{\"query\":\"buyer-country=ITA AND classification-cpv=72*\",\"fields\":[\"publication-number\",\"notice-title\"],\"limit\":250,\"page\":{page}}'\n      pages: 20\n      record: '\\{\"publication-number\".*?\\}\\}'\n      fields: { publication_number: '\"publication-number\":\"([^\"]+)\"' }\n# 3) bulk CSV file(s), zipped or not, streamed and filtered\n- stage: httpSource\n  args:\n    - urls: [\"https://dati.anticorruzione.it/opendata/download/dataset/cig/filesystem/20261101-cig_csv.zip\"]\n      format: csv                 # zip/gz detected from the URL (or unzip: true / gzip: true)\n      delimiter: \";\"\n      columns: [cig, oggetto_gara, importo_lotto, cod_cpv, provincia, data_pubblicazione]   # optional subset\n      filter: { cod_cpv: '^72', provincia: 'MILANO|ROMA' }    # optional: column -> regex, all must match\n      limit: 0                    # optional max rows per file (0 = all)\n      sourceColumn: source_url    # optional: add the file URL to each row"
   },
   {
+    "stage_name": "hubspotSync",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "companyF",
+        "type": "string",
+        "required": false,
+        "default": "company",
+        "description": "company name column"
+      },
+      {
+        "name": "domainF",
+        "type": "string",
+        "required": false,
+        "default": "domain",
+        "description": "company domain / website column (\"\" = none)"
+      },
+      {
+        "name": "typeF",
+        "type": "string",
+        "required": false,
+        "default": "signal_type",
+        "description": "signal type column: tender, hiring, funding, registry, conversation, engagement, inbound"
+      },
+      {
+        "name": "urlF",
+        "type": "string",
+        "required": false,
+        "default": "signal_url",
+        "description": "link to the signal"
+      },
+      {
+        "name": "dateF",
+        "type": "string",
+        "required": false,
+        "default": "signal_date",
+        "description": "date of the signal (YYYY-MM-DD…)"
+      },
+      {
+        "name": "summaryF",
+        "type": "string",
+        "required": false,
+        "default": "signal_summary",
+        "description": "one-line summary column"
+      },
+      {
+        "name": "emailF",
+        "type": "string",
+        "required": true,
+        "description": "contact email column (\"\" = no contact)"
+      },
+      {
+        "name": "icp",
+        "type": "string",
+        "required": false,
+        "default": "default",
+        "description": "ICP profile name written on company, deal and contact"
+      },
+      {
+        "name": "scoreF",
+        "type": "string",
+        "required": false,
+        "default": "icp_score",
+        "description": "ICP score column, 0-100 (\"\" = none)"
+      },
+      {
+        "name": "source",
+        "type": "string",
+        "required": false,
+        "default": "webrobot",
+        "description": "source label (pipeline / dataset name)"
+      },
+      {
+        "name": "pipeName",
+        "type": "string",
+        "required": false,
+        "default": "Social selling",
+        "description": "deal pipeline"
+      },
+      {
+        "name": "stageName",
+        "type": "string",
+        "required": false,
+        "default": "Signal",
+        "description": "stage of new deals"
+      }
+    ],
+    "description": "Pushes GTM signals (tenders, hiring, funding, conversations…) into the organisation's HubSpot CRM — one output row per input row, with the HubSpot ids.",
+    "usage_guide": "- stage: hubspotSync\n  args:\n    - \"company\"          # company name column\n    - \"domain\"           # company domain / website column (\"\" = none)\n    - \"signal_type\"      # signal type column: tender, hiring, funding, registry, conversation, engagement, inbound\n    - \"signal_url\"       # link to the signal\n    - \"signal_date\"      # date of the signal (YYYY-MM-DD…)\n    - \"signal_summary\"   # one-line summary column\n    - \"\"                 # contact email column (\"\" = no contact)\n    - \"default\"          # ICP profile name written on company, deal and contact\n    - \"icp_score\"        # ICP score column, 0-100 (\"\" = none)\n    - \"webrobot\"         # source label (pipeline / dataset name)\n    - \"Social selling\"   # deal pipeline\n    - \"Signal\"           # stage of new deals"
+  },
+  {
     "stage_name": "istat",
     "aliases": [],
     "arg_schema": [
