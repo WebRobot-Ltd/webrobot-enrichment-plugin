@@ -1,0 +1,28 @@
+{
+  "profiles": [
+    {
+      "name": "public-sector-it",
+      "description": "Italian public bodies buying software, data and AI services (signals: TED/ANAC tenders)",
+      "countries": ["IT"],
+      "min_score": 45,
+      "freshness_days": 30,
+      "include_keywords": ["software", "piattaforma", "dati", "data", "cloud", "intelligenza artificiale", "analisi", "digitale", "sistema informativo", "portale", "applicativ"],
+      "exclude_keywords": ["pulizia", "manutenzione impianti", "ristorazione", "mensa", "arredi", "veicoli"],
+      "signal_weights": {"tender": 1.0, "funding": 0.6, "hiring": 0.5, "inbound": 1.0, "other": 0.3},
+      "value_bands": [[1000000, 1.0], [200000, 0.85], [50000, 0.65], [0, 0.45]],
+      "roles": ["Responsabile sistemi informativi", "CIO", "RUP", "Responsabile transizione digitale"]
+    },
+    {
+      "name": "data-heavy-smb",
+      "description": "SMBs and agencies whose business runs on web and market data (WebRobot's own ICP)",
+      "countries": ["IT", "GB", "CY", "DE", "FR", "ES"],
+      "min_score": 40,
+      "freshness_days": 21,
+      "include_keywords": ["data engineer", "scraping", "crawler", "web data", "price monitoring", "lead generation", "etl", "spark", "market intelligence", "e-commerce"],
+      "exclude_keywords": ["stage non retribuito"],
+      "signal_weights": {"hiring": 1.0, "funding": 0.9, "conversation": 0.7, "engagement": 0.8, "inbound": 1.0, "registry": 0.4, "tender": 0.6, "other": 0.3},
+      "value_bands": [],
+      "roles": ["CTO", "Head of Data", "Data Engineering Lead", "Founder", "Head of Growth"]
+    }
+  ]
+}

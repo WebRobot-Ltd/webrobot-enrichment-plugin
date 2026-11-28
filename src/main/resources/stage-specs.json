@@ -604,10 +604,69 @@
         "required": false,
         "default": "Signal",
         "description": "stage of new deals"
+      },
+      {
+        "name": "reasonF",
+        "type": "string",
+        "required": false,
+        "default": "icp_reason",
+        "description": "why the signal fits (from icpScore) → wr_icp_reason (\"\" = none)"
       }
     ],
     "description": "Pushes GTM signals (tenders, hiring, funding, conversations…) into the organisation's HubSpot CRM — one output row per input row, with the HubSpot ids.",
-    "usage_guide": "- stage: hubspotSync\n  args:\n    - \"company\"          # company name column\n    - \"domain\"           # company domain / website column (\"\" = none)\n    - \"signal_type\"      # signal type column: tender, hiring, funding, registry, conversation, engagement, inbound\n    - \"signal_url\"       # link to the signal\n    - \"signal_date\"      # date of the signal (YYYY-MM-DD…)\n    - \"signal_summary\"   # one-line summary column\n    - \"\"                 # contact email column (\"\" = no contact)\n    - \"default\"          # ICP profile name written on company, deal and contact\n    - \"icp_score\"        # ICP score column, 0-100 (\"\" = none)\n    - \"webrobot\"         # source label (pipeline / dataset name)\n    - \"Social selling\"   # deal pipeline\n    - \"Signal\"           # stage of new deals"
+    "usage_guide": "- stage: hubspotSync\n  args:\n    - \"company\"          # company name column\n    - \"domain\"           # company domain / website column (\"\" = none)\n    - \"signal_type\"      # signal type column: tender, hiring, funding, registry, conversation, engagement, inbound\n    - \"signal_url\"       # link to the signal\n    - \"signal_date\"      # date of the signal (YYYY-MM-DD…)\n    - \"signal_summary\"   # one-line summary column\n    - \"\"                 # contact email column (\"\" = no contact)\n    - \"default\"          # ICP profile name written on company, deal and contact\n    - \"icp_score\"        # ICP score column, 0-100 (\"\" = none)\n    - \"webrobot\"         # source label (pipeline / dataset name)\n    - \"Social selling\"   # deal pipeline\n    - \"Signal\"           # stage of new deals\n    - \"icp_reason\"       # why the signal fits (from icpScore) → wr_icp_reason (\"\" = none)"
+  },
+  {
+    "stage_name": "icpScore",
+    "aliases": [],
+    "arg_schema": [
+      {
+        "name": "profilesArg",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "profileName",
+        "type": "string",
+        "required": false,
+        "default": "default"
+      },
+      {
+        "name": "textF",
+        "type": "string",
+        "required": false,
+        "default": "signal_summary,company"
+      },
+      {
+        "name": "typeF",
+        "type": "string",
+        "required": false,
+        "default": "signal_type"
+      },
+      {
+        "name": "dateF",
+        "type": "string",
+        "required": false,
+        "default": "signal_date"
+      },
+      {
+        "name": "valueF",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "countryF",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "overrideF",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "description": "Scores GTM signals against a CONFIGURABLE ideal-customer profile (ICP) and gates them — one output row per input row, with the score, the gate decision and the reason written out.",
+    "usage_guide": "{\"name\": \"public-sector-it\", \"countries\": [\"IT\"], \"min_score\": 45, \"freshness_days\": 30,\n \"include_keywords\": [\"software\", \"dati\", \"cloud\", \"intelligenza artificiale\"],\n \"exclude_keywords\": [\"pulizia\", \"manutenzione impianti\"],\n \"signal_weights\": {\"tender\": 1.0, \"hiring\": 0.8, \"funding\": 0.7, \"inbound\": 1.0, \"conversation\": 0.5},\n \"value_bands\": [[1000000, 1.0], [200000, 0.85], [50000, 0.65], [0, 0.45]],\n \"roles\": [\"CIO\", \"Responsabile sistemi informativi\", \"RUP\"]}"
   },
   {
     "stage_name": "istat",

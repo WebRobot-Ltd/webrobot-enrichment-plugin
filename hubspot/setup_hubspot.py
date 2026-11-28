@@ -36,6 +36,7 @@ COMMON = [
     prop("wr_icp_profile", "ICP profile", desc="Ideal-customer profile that matched (configurable in the GTM app)"),
     prop("wr_icp_score", "ICP score", "number", "number", desc="0-100: ICP fit × signal strength × freshness"),
     prop("wr_source", "WebRobot source", desc="Pipeline / dataset the record came from"),
+    prop("wr_icp_reason", "ICP reason", "string", "textarea", desc="Why the signal fits the ICP (icpScore)"),
 ]
 PROPS = {
     "companies": COMMON + [

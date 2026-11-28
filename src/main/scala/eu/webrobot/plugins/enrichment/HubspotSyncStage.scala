@@ -38,7 +38,9 @@ import scala.util.Try
  *     - "webrobot"         # source label (pipeline / dataset name)
  *     - "Social selling"   # deal pipeline
  *     - "Signal"           # stage of new deals
+ *     - "icp_reason"       # why the signal fits (from icpScore) → wr_icp_reason ("" = none)
  * }}}
+ * A row's own `icp_profile` column (from icpScore) wins over the ICP profile argument.
  * Adds hs_company_id, hs_deal_id, hs_contact_id, hs_deal_url, hs_status (created / updated / error:…).
  */
 class HubspotSyncStage extends WPartitionStage {
@@ -58,6 +60,7 @@ class HubspotSyncStage extends WPartitionStage {
     val source    = args.string(9, "webrobot")
     val pipeName  = args.string(10, "Social selling")
     val stageName = args.string(11, "Signal")
+    val reasonF   = args.string(12, "icp_reason")
     val all = rows.toList
     if (all.isEmpty) return Iterator.empty
     val token = Option(System.getenv("HUBSPOT_API_KEY")).filter(_.nonEmpty)
@@ -84,7 +87,8 @@ class HubspotSyncStage extends WPartitionStage {
         val summary = s(r, summaryF).take(2000)
         val score   = if (scoreF.isEmpty) None else r.double(scoreF).filter(v => !v.isNaN)
         val sigId   = Hubspot.sha1(Seq(key, typ, if (url.nonEmpty) url else summary + date).mkString("|")).take(24)
-        Hubspot.Sig(r, company, domain, key, typ, url, date, summary, s(r, emailF).toLowerCase, score, sigId)
+        Hubspot.Sig(r, company, domain, key, typ, url, date, summary, s(r, emailF).toLowerCase, score, sigId,
+          Some(s(r, "icp_profile")).filter(_.nonEmpty).getOrElse(icp), s(r, reasonF).take(1000))
       }
       Try(hs.sync(sigs.filter(_.key.nonEmpty), icp, source, pipeId, stageId)).map { res =>
         sigs.map { g =>
@@ -110,7 +114,7 @@ object Hubspot {
   val TYPES = Set("tender", "hiring", "funding", "registry", "conversation", "engagement", "inbound", "other")
 
   final case class Sig(row: WRow, company: String, domain: String, key: String, typ: String, url: String, date: String,
-                       summary: String, email: String, score: Option[Double], sigId: String)
+                       summary: String, email: String, score: Option[Double], sigId: String, icp: String, reason: String)
 
   def num(v: Double): String = String.format(java.util.Locale.ROOT, "%.1f", Double.box(v))
 
@@ -187,10 +191,11 @@ object Hubspot {
       val byKey = sigs.groupBy(_.key).map { case (k, gs) => k -> gs.maxBy(g => g.date + g.sigId) }
       val compIn = byKey.values.map { g =>
         obj(Seq("idProperty" -> q("wr_key"), "id" -> q(g.key), "properties" -> obj(Seq(
-          "wr_key" -> q(g.key), "wr_icp_profile" -> q(icp), "wr_source" -> q(source), "wr_last_signal_type" -> q(g.typ),
+          "wr_key" -> q(g.key), "wr_icp_profile" -> q(g.icp), "wr_source" -> q(source), "wr_last_signal_type" -> q(g.typ),
           "wr_last_signal_url" -> q(g.url)) ++
           (if (g.company.nonEmpty) Seq("name" -> q(g.company)) else Nil) ++
           (if (g.domain.nonEmpty) Seq("domain" -> q(g.domain)) else Nil) ++
+          (if (g.reason.nonEmpty) Seq("wr_icp_reason" -> q(g.reason)) else Nil) ++
           (if (g.date.nonEmpty) Seq("wr_last_signal_at" -> q(g.date)) else Nil) ++
           g.score.map(v => "wr_icp_score" -> Hubspot.num(v)).toSeq)))
       }
@@ -201,7 +206,8 @@ object Hubspot {
         "wr_signal_id")
       def dealProps(g: Sig): Seq[(String, String)] = Seq(
         "wr_signal_id" -> q(g.sigId), "wr_signal_type" -> q(g.typ), "wr_signal_url" -> q(g.url),
-        "wr_signal_summary" -> q(g.summary), "wr_icp_profile" -> q(icp), "wr_source" -> q(source)) ++
+        "wr_signal_summary" -> q(g.summary), "wr_icp_profile" -> q(g.icp), "wr_source" -> q(source)) ++
+        (if (g.reason.nonEmpty) Seq("wr_icp_reason" -> q(g.reason)) else Nil) ++
         (if (g.date.nonEmpty) Seq("wr_signal_date" -> q(g.date)) else Nil) ++ g.score.map(v => "wr_icp_score" -> Hubspot.num(v)).toSeq
       val uniq = sigs.groupBy(_.sigId).map(_._2.head).toList
       val (old, fresh) = uniq.partition(g => existing.contains(g.sigId))
@@ -216,7 +222,7 @@ object Hubspot {
       val withEmail = uniq.filter(_.email.contains("@"))
       val contactIds = if (withEmail.isEmpty) Map.empty[String, String] else ids(call("POST", "/crm/v3/objects/contacts/batch/upsert",
         s"""{"inputs":[${withEmail.groupBy(_.email).map(_._2.head).map(g => obj(Seq("idProperty" -> q("email"), "id" -> q(g.email),
-          "properties" -> obj(Seq("email" -> q(g.email), "wr_icp_profile" -> q(icp), "wr_source" -> q(source), "wr_signal_url" -> q(g.url)))))).mkString(",")}]}"""),
+          "properties" -> obj(Seq("email" -> q(g.email), "wr_icp_profile" -> q(g.icp), "wr_source" -> q(source), "wr_signal_url" -> q(g.url)))))).mkString(",")}]}"""),
         "email")
       // 4. associations (default types): deal → company, deal → contact, contact → company
       def assoc(from: String, to: String, pairs: Seq[(String, String)]): Unit = if (pairs.nonEmpty)
